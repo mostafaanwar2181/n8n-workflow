@@ -19,6 +19,7 @@
 11. [Video Presentation](#video-presentation)
 12. [AI Disclosure](#ai-disclosure)
 13. [Folder Structure](#folder-structure)
+14. [Editing & Copilot Guide](COPILOT.md)
 
 ---
 
@@ -531,6 +532,7 @@ As required by Section 9 of the assessment:
 
 ```
 ├── README.md                                    # This file — setup, decisions, limitations
+├── COPILOT.md                                   # Guide: editing the repo & using GitHub Copilot
 ├── run-all-tests.js                             # Automated test runner (25 scenarios, live n8n + Groq API)
 ├── SolverAI_Technical_Assessment.pdf            # Assessment brief
 ├── architecture/
