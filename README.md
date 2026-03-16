@@ -19,6 +19,7 @@
 11. [Video Presentation](#video-presentation)
 12. [AI Disclosure](#ai-disclosure)
 13. [Folder Structure](#folder-structure)
+14. [Using GitHub Copilot](#using-github-copilot)
 
 ---
 
@@ -552,3 +553,143 @@ As required by Section 9 of the assessment:
 └── dashboard/
     └── dashboard-mockup.html                    # Admin dashboard mockup with 6 metric panels + annotations
 ```
+
+---
+
+## Using GitHub Copilot
+
+GitHub Copilot is an AI-powered coding assistant that provides inline code suggestions, a chat interface, and other productivity features. This section explains how to use Copilot while working with this repository in different environments.
+
+---
+
+### Prerequisites
+
+Before enabling Copilot in any environment, make sure you have:
+
+1. **A GitHub Copilot subscription** — Individual, Business, or Enterprise.
+   - Sign up or check your subscription at [github.com/features/copilot](https://github.com/features/copilot).
+   - Free-tier users (e.g., verified students and open-source maintainers) can also access Copilot for free via [GitHub Education](https://education.github.com/).
+2. **Organization policy (if using an org account)** — An organization owner must enable Copilot access for members.
+   - Org owners: Go to **Organization Settings → Copilot → Policies** to enable Copilot for members.
+   - See: [Managing Copilot policies in your organization](https://docs.github.com/en/copilot/managing-copilot/managing-github-copilot-in-your-organization/managing-policies-for-copilot-in-your-organization).
+3. **A supported editor** — VS Code, GitHub Codespaces, JetBrains IDEs, Neovim, Visual Studio, or Azure Data Studio.
+
+---
+
+### Option 1 — Local Development in VS Code
+
+This is the recommended approach for running and editing the project locally.
+
+#### Step-by-step setup
+
+1. **Install VS Code** from [code.visualstudio.com](https://code.visualstudio.com/) if you haven't already.
+2. **Clone this repository:**
+   ```bash
+   git clone https://github.com/mostafaanwar2181/n8n-workflow.git
+   cd n8n-workflow
+   ```
+3. **Install the GitHub Copilot extension:**
+   - Open VS Code.
+   - Go to the **Extensions** panel (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+   - Search for **"GitHub Copilot"** and click **Install**.
+   - Optionally install **"GitHub Copilot Chat"** for the chat panel (bundled since VS Code 1.85+).
+4. **Sign in to GitHub:**
+   - After installation, a sign-in prompt appears in the bottom-left status bar.
+   - Click it → **Sign in to GitHub** → authorize in your browser → return to VS Code.
+   - Verify the Copilot icon in the status bar shows as active (no strikethrough).
+5. **Start using Copilot:**
+   - **Inline suggestions:** Open any file and start typing. Copilot will show ghost-text suggestions; press `Tab` to accept.
+   - **Copilot Chat panel:** Click the chat icon in the Activity Bar (or press `Ctrl+Alt+I` / `Cmd+Alt+I`). Ask questions like _"What does this workflow node do?"_ or _"Help me write a test for the Pre-Visit Agent"_.
+   - **Inline chat:** Highlight code → press `Ctrl+I` / `Cmd+I` → type a prompt (e.g., "Explain this function" or "Refactor to use async/await").
+   - **Quick Chat:** Press `Ctrl+Shift+Alt+L` / `Cmd+Shift+Alt+L` for a floating chat.
+
+#### Useful references
+- [Getting started with GitHub Copilot in VS Code](https://docs.github.com/en/copilot/getting-started-with-github-copilot?tool=vscode)
+- [Using GitHub Copilot Chat in VS Code](https://docs.github.com/en/copilot/using-github-copilot/asking-github-copilot-questions-in-your-ide)
+
+---
+
+### Option 2 — GitHub Codespaces (VS Code in the browser + terminal)
+
+Codespaces gives you a full cloud-hosted VS Code environment with a terminal — you can install dependencies, run the project, and use Copilot without installing anything locally.
+
+#### Step-by-step setup
+
+1. **Open a Codespace for this repo:**
+   - On the repository page on GitHub, click **Code → Codespaces → Create codespace on main**.
+   - Wait for the environment to build (usually 1–2 minutes).
+2. **Copilot is pre-installed in Codespaces** — the GitHub Copilot and Copilot Chat extensions are automatically available in all Codespaces.
+3. **Sign in (if prompted):**
+   - If you see a sign-in prompt in the status bar, click it and authorize with your GitHub account.
+   - Copilot uses the same GitHub account that owns or has access to the Codespace, so sign-in is usually automatic.
+4. **Run the project in the terminal:**
+   ```bash
+   npm install           # install dependencies
+   node run-all-tests.js # run the test suite (requires a running n8n instance and Groq API key)
+   ```
+5. **Use Copilot features** — all the same features as VS Code local apply:
+   - Inline suggestions while typing.
+   - Copilot Chat panel (chat icon in Activity Bar or `Ctrl+Alt+I`).
+   - Inline chat (`Ctrl+I` on selected code).
+
+#### Notes on Codespaces
+- Codespaces usage consumes **compute minutes** from your GitHub plan (free tier includes 120 core-hours/month as of 2026).
+- The Codespace owner must have Copilot enabled on their account/org.
+- Check your usage at [github.com/settings/billing](https://github.com/settings/billing).
+
+#### Useful references
+- [Using GitHub Copilot in a Codespace](https://docs.github.com/en/codespaces/developing-in-a-codespace/using-github-copilot-in-github-codespaces)
+- [Introduction to GitHub Codespaces](https://docs.github.com/en/codespaces/overview)
+
+---
+
+### Option 3 — github.dev (browser-based VS Code editor)
+
+**github.dev** is a lightweight, browser-based VS Code environment that loads instantly from any GitHub repo.
+
+#### How to open
+- Press the `.` (dot) key on the keyboard while viewing this repo on GitHub, **or**
+- Change the URL from `github.com/mostafaanwar2181/n8n-workflow` to `github.dev/mostafaanwar2181/n8n-workflow`.
+
+#### GitHub Copilot in github.dev (as of 2026)
+- **GitHub Copilot Chat** is available in github.dev as an extension. You can install it from the Extensions panel inside github.dev.
+- **Inline code completions** from Copilot are available after installing the extension and signing in.
+- **Limitation — no terminal / no runtime:** github.dev does not provide a terminal or the ability to run code. You can edit files and commit, but you cannot run `npm install`, execute tests, or start the n8n server here. For running the project, use **Codespaces** (Option 2) or your **local machine** (Option 1).
+
+#### Useful references
+- [Working in the github.dev editor](https://docs.github.com/en/codespaces/the-githubdev-web-based-editor)
+
+---
+
+### Option 4 — GitHub Web Editor (single-file editor)
+
+The GitHub web editor is accessible by clicking the **Edit (pencil) icon** on any file in the GitHub UI.
+
+#### GitHub Copilot in the GitHub web editor (as of 2026)
+- **Copilot completions are available** in the single-file web editor for accounts with an active Copilot subscription. Suggestions appear as you type, just like in VS Code.
+- **No chat panel** is available in the basic web editor — for the full Copilot Chat experience, use VS Code or Codespaces.
+- **Limitation:** The web editor is best suited for small, single-file edits. For multi-file changes, refactoring, or running the project, use Codespaces or local VS Code.
+
+#### Useful references
+- [About writing and formatting on GitHub](https://docs.github.com/en/get-started/writing-on-github)
+- [Editing files in your repository](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
+
+---
+
+### Summary Table
+
+| Environment | Inline Suggestions | Copilot Chat | Terminal / Run Code | Recommended For |
+|---|---|---|---|---|
+| **VS Code (local)** | ✅ | ✅ | ✅ | Full development, running n8n locally |
+| **GitHub Codespaces** | ✅ | ✅ | ✅ | Cloud dev, running the project without local setup |
+| **github.dev** | ✅ (with extension) | ✅ (with extension) | ❌ | Quick edits, file browsing, committing changes |
+| **GitHub web editor** | ✅ | ❌ | ❌ | Single-file quick edits only |
+
+---
+
+### Additional Resources
+
+- [GitHub Copilot Documentation (official)](https://docs.github.com/en/copilot)
+- [GitHub Copilot plans and pricing](https://github.com/features/copilot#pricing)
+- [Troubleshooting GitHub Copilot](https://docs.github.com/en/copilot/troubleshooting-github-copilot)
+- [GitHub Copilot Trust Center](https://resources.github.com/copilot-trust-center/)
