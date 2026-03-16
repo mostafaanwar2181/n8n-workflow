@@ -10,15 +10,16 @@
 2. [Architecture Overview](#architecture-overview)
 3. [Technology Decisions](#technology-decisions)
 4. [Setup Instructions](#setup-instructions)
-5. [Agent Descriptions](#agent-descriptions)
-6. [Data Models](#data-models)
-7. [Testing](#testing)
-8. [Dashboard](#dashboard)
-9. [Known Limitations](#known-limitations)
-10. [Bonus Features](#bonus-features)
-11. [Video Presentation](#video-presentation)
-12. [AI Disclosure](#ai-disclosure)
-13. [Folder Structure](#folder-structure)
+5. [Editing & Running Code in the Browser](#editing--running-code-in-the-browser)
+6. [Agent Descriptions](#agent-descriptions)
+7. [Data Models](#data-models)
+8. [Testing](#testing)
+9. [Dashboard](#dashboard)
+10. [Known Limitations](#known-limitations)
+11. [Bonus Features](#bonus-features)
+12. [Video Presentation](#video-presentation)
+13. [AI Disclosure](#ai-disclosure)
+14. [Folder Structure](#folder-structure)
 
 ---
 
@@ -254,6 +255,114 @@ For the final assessment demo, use the n8n UI as the live application surface:
 8. Open `dashboard/dashboard-mockup.html` separately to present the monitoring/dashboard view
 
 The demo workflow is: **Forms (patient UI) → Webhooks (API) → Live Execution → Dashboard**
+
+---
+
+## Editing & Running Code in the Browser
+
+You have several options for viewing and editing this project's code directly from GitHub, without installing anything locally. Below is a comparison of what each environment supports.
+
+### Quick Comparison
+
+| Environment | Edit Code | Terminal / Run Commands | GitHub Copilot |
+|---|---|---|---|
+| **GitHub web editor** | ✅ Yes (single files) | ❌ No | ❌ No |
+| **github.dev** | ✅ Yes (full editor) | ❌ No | ⚠️ Limited |
+| **GitHub Codespaces** | ✅ Yes (full VS Code) | ✅ Yes | ✅ Yes |
+| **Local VS Code** | ✅ Yes (full VS Code) | ✅ Yes | ✅ Yes |
+
+---
+
+### Option 1: GitHub Web Editor (Quick Single-File Edits)
+
+Best for: fixing a typo, updating a single file, adding a short snippet.
+
+1. Open the repository on [github.com](https://github.com/mostafaanwar2181/n8n-workflow).
+2. Navigate to the file you want to change (e.g. `README.md`).
+3. Click the **pencil ✏️** (Edit this file) button in the top-right of the file view.
+4. Make your edits in the text area.
+5. Scroll down and click **Commit changes** to save.
+
+**Limitation:** You can only edit one file at a time. There is no terminal, no way to run `npm install`, and no extension support.
+
+📖 Official docs: [Editing files in your repository](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
+
+---
+
+### Option 2: github.dev (VS Code–Like Editor in the Browser)
+
+Best for: browsing multiple files, making cross-file edits, using a familiar VS Code layout — without needing to install anything.
+
+**To open github.dev:**
+- **Keyboard shortcut:** While viewing the repo on GitHub, press the `.` (dot) key.
+- **URL change:** Replace `github.com` with `github.dev` in the address bar:
+  - From: `https://github.com/mostafaanwar2181/n8n-workflow`
+  - To:   `https://github.dev/mostafaanwar2181/n8n-workflow`
+
+**What you can do:**
+- Browse and edit files across the whole repository.
+- Use the file explorer, search, and diff views just like in VS Code.
+- Commit and push changes directly from the Source Control panel.
+
+**Limitations:**
+- **No terminal** — you cannot run `npm install`, `npx n8n start`, or any shell commands.
+- **No extensions that require a backend** — running the project or debugging is not possible here.
+- **GitHub Copilot availability is limited** in github.dev compared to full VS Code or Codespaces.
+
+📖 Official docs: [github.dev web-based editor](https://docs.github.com/en/codespaces/the-githubdev-web-based-editor)
+
+---
+
+### Option 3: GitHub Codespaces (Full VS Code + Terminal in the Browser)
+
+Best for: running the project, installing dependencies, using GitHub Copilot, and getting the full development experience — all in your browser.
+
+**To create a Codespace:**
+1. On the repository page, click the green **Code** button.
+2. Select the **Codespaces** tab.
+3. Click **Create codespace on main** (or your branch).
+4. Wait for the environment to build — a full VS Code window opens in your browser.
+
+**Once inside the Codespace, you can run the project:**
+```bash
+# Install n8n globally
+npm install -g n8n
+
+# Start n8n
+npx n8n start
+```
+
+Then open the forwarded port (n8n starts at port `5678`) from the **Ports** panel in VS Code.
+
+**GitHub Copilot in Codespaces:**
+1. Open the **Extensions** panel (left sidebar).
+2. Search for **GitHub Copilot** and **GitHub Copilot Chat**.
+3. Install and enable both extensions.
+4. Sign in with your GitHub account when prompted.
+5. Copilot inline suggestions and chat will now be available.
+
+**Limitations:**
+- Codespaces may require a GitHub plan that includes Codespaces minutes (free tier includes 120 core-hours/month on personal accounts as of 2024).
+- You must have permission to create a Codespace in the repository.
+- Model availability in Copilot Chat may vary between environments (web, Codespaces, local VS Code) — if a model appears on the GitHub website but not in your editor, ensure your extensions are up to date and you are signed into the correct account.
+
+📖 Official docs: [GitHub Codespaces overview](https://docs.github.com/en/codespaces/overview)  
+📖 GitHub Copilot in Codespaces: [Using GitHub Copilot in GitHub Codespaces](https://docs.github.com/en/codespaces/developing-in-a-codespace/using-github-copilot-in-github-codespaces)
+
+---
+
+### Option 4: Local VS Code (Recommended for Full Development)
+
+For the most complete experience — especially for running n8n workflows with live API calls — clone the repo and work locally:
+
+```bash
+git clone https://github.com/mostafaanwar2181/n8n-workflow.git
+cd n8n-workflow
+```
+
+Then open the folder in VS Code and follow the [Setup Instructions](#setup-instructions) above.
+
+📖 Official docs: [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
 
 ---
 
