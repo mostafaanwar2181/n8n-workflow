@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Patient",
+  "description": "Core patient demographic and contact record used across all five agent pillars.",
+  "type": "object",
+  "required": [
+    "patientId",
+    "firstName",
+    "lastName",
+    "dateOfBirth",
+    "gender",
+    "phone",
+    "email",
+    "consentStatus",
+    "createdAt"
+  ],
+  "properties": {
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Unique patient identifier. Format: PAT-XXXXXXXX (8 digits)."
+    },
+    "firstName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Patient's legal first name."
+    },
+    "lastName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Patient's legal last name."
+    },
+    "dateOfBirth": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of birth in ISO 8601 format (YYYY-MM-DD). Must be in the past."
+    },
+    "gender": {
+      "type": "string",
+      "enum": ["male", "female", "other"],
+      "description": "Patient gender. Used for conditional logic (e.g., pregnancy question for females aged 15–55)."
+    },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\+?[0-9]{10,15}$",
+      "description": "Primary contact phone number. International format preferred."
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Primary email address for communications and outreach."
+    },
+    "address": {
+      "type": "object",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "country": { "type": "string", "default": "MY" }
+      },
+      "description": "Patient's residential address."
+    },
+    "emergencyContact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "relationship": { "type": "string" },
+        "phone": { "type": "string", "pattern": "^\\+?[0-9]{10,15}$" }
+      },
+      "description": "Emergency contact details."
+    },
+    "consentStatus": {
+      "type": "object",
+      "required": ["messagingConsent", "dataProcessingConsent"],
+      "properties": {
+        "messagingConsent": {
+          "type": "boolean",
+          "description": "Whether the patient has opted in for messaging outreach. Required by Retention Agent before any contact."
+        },
+        "dataProcessingConsent": {
+          "type": "boolean",
+          "description": "Whether the patient has consented to data processing."
+        },
+        "consentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when consent was last updated."
+        }
+      }
+    },
+    "segmentType": {
+      "type": "string",
+      "enum": ["chronic", "wellness", "one-time", "unclassified"],
+      "default": "unclassified",
+      "description": "Patient segment classification used by Retention Agent. chronic = 3+ visits with chronic condition; wellness = regular checkups; one-time = single visit."
+    },
+    "lastVisitDate": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date of the most recent visit. Null if no visits recorded. Used by Retention Agent to identify 6+ month inactivity."
+    },
+    "branchId": {
+      "type": "string",
+      "description": "Identifier of the primary clinic branch the patient is associated with."
+    },
+    "suppressionFlags": {
+      "type": "object",
+      "properties": {
+        "unresolvedClinicalIssue": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, Retention Agent must suppress all outreach."
+        },
+        "unresolvedBillingIssue": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, Retention Agent must suppress marketing outreach."
+        },
+        "contactFrequencyCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of outreach contacts this month. Max 2 per month per patient."
+        },
+        "contactFrequencyResetDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when contactFrequencyCount resets to 0 (1st of next month)."
+        }
+      },
+      "description": "Suppression flags used by Retention Agent to prevent inappropriate outreach."
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the patient record is active in the system."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when patient record was created."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when patient record was last modified."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IntakeForm",
+  "description": "Pre-visit intake form collected before clinical appointment. Pre-Visit Agent validates completeness, insurance format, conditional fields, and computes risk score.",
+  "type": "object",
+  "required": [
+    "intakeId",
+    "patientId",
+    "visitId",
+    "personalInfo",
+    "insurancePolicyNumber",
+    "medicalHistory",
+    "completionStatus",
+    "submittedAt"
+  ],
+  "properties": {
+    "intakeId": {
+      "type": "string",
+      "pattern": "^INT-[0-9]{8}$",
+      "description": "Unique intake form identifier. Format: INT-XXXXXXXX."
+    },
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Reference to the Patient record."
+    },
+    "visitId": {
+      "type": "string",
+      "pattern": "^VIS-[0-9]{8}$",
+      "description": "Reference to the scheduled Visit."
+    },
+    "personalInfo": {
+      "type": "object",
+      "required": ["fullName", "dateOfBirth", "gender", "phone"],
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Patient full legal name. MANDATORY."
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of birth. MANDATORY. Validated against Patient record."
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["male", "female", "other"],
+          "description": "Gender. MANDATORY. Drives conditional logic (pregnancy question for female 15-55)."
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+?[0-9]{10,15}$",
+          "description": "Contact phone. MANDATORY."
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "insurancePolicyNumber": {
+      "type": "string",
+      "pattern": "^POL-[A-Z]{2}-[0-9]{8}$",
+      "description": "Insurance policy number. MANDATORY. Must match format POL-XX-XXXXXXXX (e.g., POL-MY-20230415). Validated by Pre-Visit Agent."
+    },
+    "medicalHistory": {
+      "type": "object",
+      "required": ["currentConditions", "currentMedications", "allergies"],
+      "properties": {
+        "currentConditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "hypertension",
+              "diabetes",
+              "asthma",
+              "heart-disease",
+              "chest-pain",
+              "stroke-history",
+              "cancer",
+              "kidney-disease",
+              "liver-disease",
+              "obesity",
+              "depression",
+              "anxiety",
+              "arthritis",
+              "none"
+            ]
+          },
+          "description": "Current medical conditions. Used for risk scoring. Hypertension + chest-pain = high risk."
+        },
+        "currentMedications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "dosage": { "type": "string" },
+              "frequency": { "type": "string" }
+            }
+          },
+          "description": "Current medications. Used for contraindication checks on refills."
+        },
+        "allergies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Known allergies. MANDATORY (can be empty array if none)."
+        },
+        "previousSurgeries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "procedure": { "type": "string" },
+              "date": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        "familyHistory": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Relevant family medical history."
+        }
+      }
+    },
+    "pregnancyStatus": {
+      "type": ["string", "null"],
+      "enum": ["pregnant", "not-pregnant", "unsure", null],
+      "description": "CONDITIONAL FIELD: Required when gender=female AND age is 15-55. Pre-Visit Agent must prompt if missing."
+    },
+    "smokingStatus": {
+      "type": "string",
+      "enum": ["current", "former", "never"],
+      "description": "Smoking status for risk assessment."
+    },
+    "riskScore": {
+      "type": "object",
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "Computed risk score. Scoring: hypertension=+3, chest-pain=+4, diabetes=+2, heart-disease=+4, stroke-history=+4, cancer=+3, kidney-disease=+2, smoking-current=+2, age>65=+2. Threshold: >=7 triggers nurse queue escalation."
+        },
+        "level": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "low: 0-3, medium: 4-6, high: 7-10, critical: 11+"
+        },
+        "escalationTriggered": {
+          "type": "boolean",
+          "description": "True if score >= 7, triggering nurse queue escalation."
+        },
+        "computedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "Risk score computed by Rules Engine based on medical history."
+    },
+    "completionStatus": {
+      "type": "string",
+      "enum": ["complete", "incomplete", "pending-followup", "abandoned"],
+      "description": "Tracks form completion state. Incomplete triggers auto follow-up within defined window."
+    },
+    "missingFields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of field names that are missing or invalid. Populated by validation engine."
+    },
+    "validationErrors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "error": { "type": "string" },
+          "code": { "type": "string" }
+        }
+      },
+      "description": "Structured validation error messages returned to patient."
+    },
+    "followUpSentAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp of auto follow-up message sent for incomplete forms. Null if not yet sent."
+    },
+    "followUpDeadline": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Deadline by which incomplete form must be completed (24h after initial submission)."
+    },
+    "submittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of form submission."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last modification."
+    }
+  },
+  "additionalProperties": false
+}

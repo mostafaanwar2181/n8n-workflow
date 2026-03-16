@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PostVisitCheck",
+  "description": "Post-visit recovery monitoring record. Post-Visit Agent collects pain scores, symptoms, detects red flags via NLP, and triggers escalation for clinical deterioration.",
+  "type": "object",
+  "required": [
+    "checkId",
+    "patientId",
+    "visitId",
+    "checkInTime",
+    "status"
+  ],
+  "properties": {
+    "checkId": {
+      "type": "string",
+      "pattern": "^PVC-[0-9]{8}$",
+      "description": "Unique post-visit check identifier. Format: PVC-XXXXXXXX."
+    },
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Reference to the Patient record."
+    },
+    "visitId": {
+      "type": "string",
+      "pattern": "^VIS-[0-9]{8}$",
+      "description": "Reference to the completed Visit."
+    },
+    "checkInTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the automated check-in was initiated."
+    },
+    "responseReceivedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when patient responded. Null if no response yet."
+    },
+    "painScore": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Patient-reported pain score (0=no pain, 10=worst pain). Score >= 7 triggers escalation regardless of text content."
+    },
+    "symptoms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "symptom": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["mild", "moderate", "severe"]
+          },
+          "onsetTime": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Structured symptoms extracted from patient free-text by NLP."
+    },
+    "freeTextResponse": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "Raw free-form text response from the patient."
+    },
+    "redFlagDetection": {
+      "type": "object",
+      "properties": {
+        "detected": {
+          "type": "boolean",
+          "description": "Whether any red-flag phrases were identified."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "worsening-pain",
+                  "bleeding",
+                  "shortness-of-breath",
+                  "high-fever",
+                  "medication-side-effect",
+                  "other"
+                ],
+                "description": "Red-flag category as per required classifier."
+              },
+              "matchedPhrase": {
+                "type": "string",
+                "description": "The exact phrase from patient text that triggered the flag."
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "NLP confidence score for the detection."
+              }
+            }
+          },
+          "description": "List of all red flags detected. Minimum detectable: worsening pain, bleeding, shortness of breath, fever >38.5°C, medication side effects."
+        },
+        "conflictDetected": {
+          "type": "boolean",
+          "description": "True if pain score contradicts text (e.g., high score but patient says 'I'm fine'). Triggers escalation."
+        }
+      },
+      "description": "NLP red-flag classifier output."
+    },
+    "temperatureReported": {
+      "type": ["number", "null"],
+      "description": "Patient-reported temperature in Celsius. > 38.5 triggers red flag."
+    },
+    "conversationLog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "message", "timestamp"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["system", "patient", "agent"]
+          },
+          "message": { "type": "string" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "description": "Full multi-turn conversation history for this check-in."
+    },
+    "escalation": {
+      "type": "object",
+      "properties": {
+        "triggered": {
+          "type": "boolean",
+          "description": "Whether escalation was triggered."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["clinical", "emergency", "none"],
+          "description": "Escalation type. Emergency = immediate, Clinical = within SLA window."
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "Role or person escalated to (e.g., 'physician', 'prescribing-doctor', 'emergency-services')."
+        },
+        "slaDeadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "SLA deadline for response to escalation."
+        },
+        "escalatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "nextFollowUp": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Scheduled next follow-up check-in. Null if recovery complete."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "responded", "escalated", "resolved", "no-response"],
+      "description": "Current status of the post-visit check."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

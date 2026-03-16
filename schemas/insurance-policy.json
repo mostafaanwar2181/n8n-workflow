@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InsurancePolicy",
+  "description": "Insurance policy record linked to a patient. Used by Pre-Visit Agent for format validation, Billing Agent for expiry checks and coverage matching.",
+  "type": "object",
+  "required": [
+    "policyId",
+    "patientId",
+    "policyNumber",
+    "provider",
+    "coveragePlan",
+    "expiryDate",
+    "status"
+  ],
+  "properties": {
+    "policyId": {
+      "type": "string",
+      "description": "Internal unique identifier for this policy record."
+    },
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Reference to the Patient record."
+    },
+    "policyNumber": {
+      "type": "string",
+      "pattern": "^POL-[A-Z]{2}-[0-9]{8}$",
+      "description": "Insurance policy number. Required format: POL-XX-XXXXXXXX (e.g., POL-MY-20230415). Pre-Visit Agent validates this pattern."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Name of the insurance provider/company."
+    },
+    "coveragePlan": {
+      "type": "string",
+      "description": "Name or code of the coverage plan (e.g., 'Basic', 'Premium', 'Corporate-A')."
+    },
+    "coveredCodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{1,5}[0-9]{2,5}$"
+      },
+      "description": "List of treatment/procedure codes covered under this plan. Billing Agent checks treatment codes against this list to detect mismatches."
+    },
+    "coverageLimit": {
+      "type": "object",
+      "properties": {
+        "annualMax": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum annual coverage amount."
+        },
+        "remainingBalance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Remaining coverage balance for current period."
+        },
+        "currency": {
+          "type": "string",
+          "default": "MYR"
+        }
+      }
+    },
+    "effectiveDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the policy became effective."
+    },
+    "expiryDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Policy expiration date. Billing Agent validates this is not in the past at time of claim submission. Expired policy = claim rejected."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "expired", "suspended", "cancelled"],
+      "description": "Current policy status. Only 'active' policies are valid for claims."
+    },
+    "verifiedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp of last verification with insurance provider."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

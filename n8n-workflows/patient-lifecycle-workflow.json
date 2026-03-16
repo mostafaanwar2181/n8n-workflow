@@ -1,0 +1,1464 @@
+{
+  "name": "Patient Lifecycle AI System — All 5 Agents",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "🔵 Pre-Visit Intake Form",
+        "formDescription": "Patient Pre-Visit Intake Form — Collects demographics, insurance, medical history, and risk factors before clinical appointment.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Full Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "e.g. Sarah Ahmad"
+            },
+            {
+              "fieldLabel": "Date of Birth",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "YYYY-MM-DD"
+            },
+            {
+              "fieldLabel": "Gender",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "male"
+                  },
+                  {
+                    "option": "female"
+                  },
+                  {
+                    "option": "other"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Phone",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "+60123456789"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "patient@email.com"
+            },
+            {
+              "fieldLabel": "Insurance Policy Number",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "POL-MY-20230415"
+            },
+            {
+              "fieldLabel": "Current Conditions (comma-separated)",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "hypertension, diabetes, none"
+            },
+            {
+              "fieldLabel": "Current Medications (comma-separated)",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "Metformin 500mg daily, Lisinopril 10mg daily"
+            },
+            {
+              "fieldLabel": "Allergies (comma-separated)",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "Penicillin, Sulfa drugs, or none"
+            },
+            {
+              "fieldLabel": "Smoking Status",
+              "fieldType": "dropdown",
+              "requiredField": false,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "never"
+                  },
+                  {
+                    "option": "former"
+                  },
+                  {
+                    "option": "current"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Pregnancy Status (females 15-55 only)",
+              "fieldType": "dropdown",
+              "requiredField": false,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "not-pregnant"
+                  },
+                  {
+                    "option": "pregnant"
+                  },
+                  {
+                    "option": "unsure"
+                  },
+                  {
+                    "option": "N/A"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "form-pre-visit",
+      "name": "📋 Pre-Visit: Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        100
+      ],
+      "webhookId": "form-pre-visit-intake",
+      "notes": "Patient intake form",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pre-visit-intake",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-pre-visit",
+      "name": "🌐 Pre-Visit: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        280
+      ],
+      "webhookId": "pre-visit-intake",
+      "notes": "REST API intake",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔵 PRE-VISIT AGENT — RULES ENGINE: Mandatory Field Validation\n// ============================================================\n// Validates all required fields, insurance format, conditional\n// logic (pregnancy for females 15-55), and computes risk score.\n// This node handles ALL deterministic pre-visit validation.\n// ============================================================\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  let data = item.json;\n  // --- UNWRAP WEBHOOK DATA ---\n  // Webhook wraps POST body in {headers, body, params, ...}; form triggers send flat data\n  if (data.body && data.webhookUrl) { data = data.body; }\n\n  const now = new Date().toISOString();\n  \n  // --- NORMALIZE INPUT (handle both Form and Webhook) ---\n  let fullName = data.personalInfo?.fullName || data['Full Name'] || data.fullName || '';\n  let dateOfBirth = data.personalInfo?.dateOfBirth || data['Date of Birth'] || data.dateOfBirth || '';\n  let gender = data.personalInfo?.gender || data['Gender'] || data.gender || '';\n  let phone = data.personalInfo?.phone || data['Phone'] || data.phone || '';\n  let email = data.personalInfo?.email || data['Email'] || data.email || '';\n  let insurancePolicyNumber = data.insurancePolicyNumber || data['Insurance Policy Number'] || '';\n  \n  // Medical history\n  let conditionsRaw = data.medicalHistory?.currentConditions || data['Current Conditions (comma-separated)'] || data.currentConditions || '';\n  let medicationsRaw = data.medicalHistory?.currentMedications || data['Current Medications (comma-separated)'] || data.currentMedications || '';\n  let allergiesRaw = data.medicalHistory?.allergies || data['Allergies (comma-separated)'] || data.allergies || '';\n  let smokingStatus = data.smokingStatus || data['Smoking Status'] || 'never';\n  let pregnancyStatus = data.pregnancyStatus || data['Pregnancy Status (females 15-55 only)'] || null;\n  \n  // Parse comma-separated strings into arrays if needed\n  let conditions = Array.isArray(conditionsRaw) \n    ? conditionsRaw \n    : (typeof conditionsRaw === 'string' && conditionsRaw.trim() \n       ? conditionsRaw.split(',').map(s => s.trim().toLowerCase()) \n       : []);\n  \n  let medications = Array.isArray(medicationsRaw)\n    ? medicationsRaw\n    : (typeof medicationsRaw === 'string' && medicationsRaw.trim()\n       ? medicationsRaw.split(',').map(s => ({ name: s.trim(), dosage: '', frequency: '' }))\n       : []);\n  \n  let allergies = Array.isArray(allergiesRaw)\n    ? allergiesRaw\n    : (typeof allergiesRaw === 'string' && allergiesRaw.trim()\n       ? allergiesRaw.split(',').map(s => s.trim())\n       : []);\n\n  // Normalize gender\n  gender = (typeof gender === 'string') ? gender.toLowerCase().trim() : '';\n  smokingStatus = (typeof smokingStatus === 'string') ? smokingStatus.toLowerCase().trim() : 'never';\n\n  // --- MANDATORY FIELD ENFORCEMENT ---\n  const missingFields = [];\n  const validationErrors = [];\n  \n  if (!fullName || fullName.trim().length === 0) {\n    missingFields.push('fullName');\n    validationErrors.push({ field: 'fullName', error: 'Full name is required.', code: 'MISSING_REQUIRED' });\n  }\n  if (!dateOfBirth || dateOfBirth.trim().length === 0) {\n    missingFields.push('dateOfBirth');\n    validationErrors.push({ field: 'dateOfBirth', error: 'Date of birth is required.', code: 'MISSING_REQUIRED' });\n  }\n  if (!gender || !['male', 'female', 'other'].includes(gender)) {\n    missingFields.push('gender');\n    validationErrors.push({ field: 'gender', error: 'Gender is required. Must be male, female, or other.', code: 'MISSING_REQUIRED' });\n  }\n  if (!phone || phone.trim().length === 0) {\n    missingFields.push('phone');\n    validationErrors.push({ field: 'phone', error: 'Phone number is required.', code: 'MISSING_REQUIRED' });\n  }\n  if (!insurancePolicyNumber || insurancePolicyNumber.trim().length === 0) {\n    missingFields.push('insurancePolicyNumber');\n    validationErrors.push({ field: 'insurancePolicyNumber', error: 'Insurance policy number is required.', code: 'MISSING_REQUIRED' });\n  }\n  if (conditions.length === 0) {\n    missingFields.push('currentConditions');\n    validationErrors.push({ field: 'currentConditions', error: 'Current conditions are required. Enter \"none\" if none.', code: 'MISSING_REQUIRED' });\n  }\n\n  // --- INSURANCE FORMAT VALIDATION ---\n  const insurancePattern = /^POL-[A-Z]{2}-[0-9]{8}$/;\n  let insuranceValid = true;\n  if (insurancePolicyNumber && !insurancePattern.test(insurancePolicyNumber.trim())) {\n    insuranceValid = false;\n    validationErrors.push({\n      field: 'insurancePolicyNumber',\n      error: `Invalid insurance policy format. Expected: POL-XX-XXXXXXXX (e.g., POL-MY-20230415). Received: \"${insurancePolicyNumber}\"`,\n      code: 'INVALID_FORMAT'\n    });\n  }\n\n  // --- CONDITIONAL LOGIC: Pregnancy Question ---\n  let pregnancyRequired = false;\n  let age = 0;\n  if (dateOfBirth && dateOfBirth.trim()) {\n    try {\n      const dob = new Date(dateOfBirth);\n      const today = new Date();\n      age = Math.floor((today - dob) / (365.25 * 24 * 60 * 60 * 1000));\n    } catch(e) { age = 0; }\n  }\n  \n  if (gender === 'female' && age >= 15 && age <= 55) {\n    pregnancyRequired = true;\n    if (!pregnancyStatus || pregnancyStatus === 'N/A' || pregnancyStatus.trim().length === 0) {\n      missingFields.push('pregnancyStatus');\n      validationErrors.push({\n        field: 'pregnancyStatus',\n        error: 'Pregnancy status is required for female patients aged 15-55.',\n        code: 'CONDITIONAL_REQUIRED'\n      });\n    }\n  }\n\n  // --- RISK SCORE CALCULATION ---\n  const riskPoints = {\n    'hypertension': 3,\n    'chest-pain': 4,\n    'diabetes': 2,\n    'heart-disease': 4,\n    'stroke-history': 4,\n    'cancer': 3,\n    'kidney-disease': 2,\n    'liver-disease': 2\n  };\n  \n  let riskScore = 0;\n  const riskFactors = [];\n  \n  for (const condition of conditions) {\n    const c = condition.toLowerCase().replace(/\\s+/g, '-');\n    if (riskPoints[c]) {\n      riskScore += riskPoints[c];\n      riskFactors.push(`${c} (+${riskPoints[c]})`);\n    }\n  }\n  \n  if (smokingStatus === 'current') {\n    riskScore += 2;\n    riskFactors.push('current-smoker (+2)');\n  }\n  if (age > 65) {\n    riskScore += 2;\n    riskFactors.push('age>65 (+2)');\n  }\n  \n  let riskLevel = 'low';\n  if (riskScore >= 11) riskLevel = 'critical';\n  else if (riskScore >= 7) riskLevel = 'high';\n  else if (riskScore >= 4) riskLevel = 'medium';\n  \n  const escalationTriggered = riskScore >= 7;\n\n  // --- DETERMINE COMPLETION STATUS ---\n  let completionStatus = 'complete';\n  if (missingFields.length > 0) {\n    completionStatus = 'incomplete';\n  }\n\n  // --- BUILD FOLLOW-UP TASK FOR INCOMPLETE SUBMISSIONS ---\n  let followUpTask = null;\n  if (completionStatus === 'incomplete') {\n    const patientId = data.patientId || 'PAT-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n    const timestamp = Date.now();\n    followUpTask = {\n      taskId: `FU-${patientId}-${timestamp}`,\n      scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),\n      channel: 'sms',\n      retryPolicy: { maxRetries: 2, retryIntervalHours: 24 },\n      reminderMessage: `Dear ${fullName || 'Patient'}, your intake form is incomplete. Please complete the following fields: ${missingFields.join(', ')}. Complete within 24 hours to avoid appointment delays.`\n    };\n  }\n\n  // --- ESCALATION DEDUPLICATION ---\n  let escalationDeduplicated = false;\n  let dedupKey = '';\n  if (escalationTriggered) {\n    const patientId = data.patientId || 'PAT-UNKNOWN';\n    const dateStr = new Date().toISOString().split('T')[0];\n    dedupKey = `pre-visit|${patientId}|${dateStr}`;\n    \n    const staticData = $getWorkflowStaticData('global');\n    if (!staticData.escalationKeys) staticData.escalationKeys = {};\n    \n    if (staticData.escalationKeys[dedupKey]) {\n      escalationDeduplicated = true;\n    } else {\n      staticData.escalationKeys[dedupKey] = now;\n    }\n  }\n\n  // --- BUILD RESPONSE ---\n  const intakeId = 'INT-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n  \n  const response = {\n    status: completionStatus === 'complete' && !validationErrors.some(e => e.code === 'INVALID_FORMAT') ? 'accepted' : 'validation_failed',\n    intakeId: intakeId,\n    completionStatus: completionStatus,\n    personalInfo: {\n      fullName: fullName,\n      dateOfBirth: dateOfBirth,\n      gender: gender,\n      phone: phone,\n      email: email,\n      age: age\n    },\n    insurancePolicyNumber: insurancePolicyNumber,\n    insuranceValid: insuranceValid,\n    medicalHistory: {\n      currentConditions: conditions,\n      currentMedications: medications,\n      allergies: allergies.filter(a => a.toLowerCase() !== 'none')\n    },\n    pregnancyStatus: pregnancyRequired ? (pregnancyStatus || 'NOT_PROVIDED') : 'N/A',\n    pregnancyRequired: pregnancyRequired,\n    smokingStatus: smokingStatus,\n    riskScore: {\n      score: riskScore,\n      level: riskLevel,\n      escalationTriggered: escalationTriggered,\n      riskFactors: riskFactors,\n      computedAt: now\n    },\n    missingFields: missingFields,\n    validationErrors: validationErrors,\n    followUpTask: followUpTask,\n    escalation: escalationTriggered ? {\n      triggered: true,\n      deduplicated: escalationDeduplicated,\n      type: 'nurse-queue',\n      assignedTo: 'nurse-queue',\n      priority: riskLevel,\n      slaDeadline: new Date(Date.now() + 60 * 60 * 1000).toISOString(),\n      reason: `High risk score ${riskScore} (${riskLevel}). Factors: ${riskFactors.join(', ')}`\n    } : {\n      triggered: false,\n      deduplicated: false\n    },\n    auditLog: [\n      {\n        event: 'INTAKE_RECEIVED',\n        timestamp: now,\n        agent: 'pre-visit',\n        intakeId: intakeId,\n        patientName: fullName\n      },\n      {\n        event: completionStatus === 'complete' && insuranceValid ? 'INTAKE_VALIDATED' : 'INTAKE_VALIDATION_FAILED',\n        timestamp: now,\n        agent: 'pre-visit',\n        intakeId: intakeId,\n        missingFields: missingFields,\n        validationErrors: validationErrors.map(e => e.code)\n      },\n      ...(followUpTask ? [{\n        event: 'FOLLOW_UP_TASK_CREATED',\n        timestamp: now,\n        agent: 'pre-visit',\n        taskId: followUpTask.taskId,\n        scheduledAt: followUpTask.scheduledAt\n      }] : []),\n      ...(escalationTriggered && !escalationDeduplicated ? [{\n        event: 'ESCALATION_CREATED',\n        timestamp: now,\n        agent: 'pre-visit',\n        intakeId: intakeId,\n        riskScore: riskScore,\n        riskLevel: riskLevel,\n        assignedTo: 'nurse-queue'\n      }] : []),\n      ...(escalationDeduplicated ? [{\n        event: 'ESCALATION_DEDUP_BLOCKED',\n        timestamp: now,\n        agent: 'pre-visit',\n        dedupKey: dedupKey\n      }] : [])\n    ]\n  };\n\n  results.push({ json: response });\n}\n\nreturn results;"
+      },
+      "id": "previsit-validation",
+      "name": "🔵 Pre-Visit: Validate & Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        185
+      ],
+      "notes": "Risk score 0 to 10",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "previsit-escalation-check",
+              "leftValue": "={{ $json.escalation.triggered }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "previsit-if-escalation",
+      "name": "🔵 Pre-Visit: Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        185
+      ],
+      "notes": "Score 7 or above alert",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔵 PRE-VISIT — ESCALATION ENGINE: Create Nurse Queue Ticket\n// ============================================================\n\nconst data = $input.first().json;\nconst now = new Date().toISOString();\n\nif (data.escalation.deduplicated) {\n  return [{\n    json: {\n      httpStatus: 409,\n      status: 'duplicate_escalation_blocked',\n      message: 'An escalation for this patient has already been created today. Duplicate blocked.',\n      intakeId: data.intakeId,\n      riskScore: data.riskScore,\n      auditLog: data.auditLog\n    }\n  }];\n}\n\nconst ticketId = 'ESC-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\nconst alertId = 'ALT-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n\nreturn [{\n  json: {\n    status: 'escalated',\n    message: `HIGH RISK INTAKE: Patient ${data.personalInfo.fullName} has risk score ${data.riskScore.score} (${data.riskScore.level}). Escalated to nurse queue for immediate review.`,\n    intakeId: data.intakeId,\n    personalInfo: data.personalInfo,\n    riskScore: data.riskScore,\n    escalation: {\n      ticketId: ticketId,\n      alertId: alertId,\n      type: 'nurse-queue',\n      assignedTo: 'nurse-queue',\n      priority: data.riskScore.level,\n      slaDeadline: data.escalation.slaDeadline,\n      reason: data.escalation.reason\n    },\n    auditLog: [\n      ...data.auditLog,\n      {\n        event: 'ESCALATION_TICKET_CREATED',\n        timestamp: now,\n        agent: 'pre-visit',\n        ticketId: ticketId,\n        alertId: alertId,\n        assignedTo: 'nurse-queue',\n        priority: data.riskScore.level\n      }\n    ]\n  }\n}];"
+      },
+      "id": "previsit-escalate",
+      "name": "🔵 Pre-Visit: Create Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        100
+      ],
+      "notes": "Nurse alert, 24 hours",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔵 PRE-VISIT — Normal Confirmation Response\n// ============================================================\n\nconst data = $input.first().json;\n\nreturn [{\n  json: {\n    status: data.status,\n    message: data.status === 'accepted' \n      ? `Intake form accepted for ${data.personalInfo.fullName}. Risk level: ${data.riskScore.level}. ${data.pregnancyRequired && data.pregnancyStatus === 'NOT_PROVIDED' ? 'ACTION REQUIRED: Please provide pregnancy status.' : 'All fields validated successfully.'}` \n      : `Intake form has validation issues. ${data.missingFields.length > 0 ? 'Missing fields: ' + data.missingFields.join(', ') + '.' : ''} ${data.validationErrors.filter(e => e.code === 'INVALID_FORMAT').map(e => e.error).join(' ')} ${data.pregnancyRequired && data.pregnancyStatus === 'NOT_PROVIDED' ? 'Pregnancy status required for female patients aged 15-55.' : ''}`,\n    intakeId: data.intakeId,\n    completionStatus: data.completionStatus,\n    personalInfo: data.personalInfo,\n    insuranceValid: data.insuranceValid,\n    riskScore: data.riskScore,\n    missingFields: data.missingFields,\n    validationErrors: data.validationErrors,\n    pregnancyRequired: data.pregnancyRequired,\n    pregnancyStatus: data.pregnancyStatus,\n    followUpTask: data.followUpTask,\n    auditLog: data.auditLog\n  }\n}];"
+      },
+      "id": "previsit-normal",
+      "name": "🔵 Pre-Visit: Normal Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        280
+      ],
+      "notes": "Intake confirmed",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "formTitle": "🟢 Post-Visit Recovery Check-In",
+        "formDescription": "Post-Visit Recovery Check-In — Monitors pain, temperature, and symptoms after clinical appointment for early detection of complications.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Patient ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "PAT-00000001"
+            },
+            {
+              "fieldLabel": "Visit ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "VIS-00000001"
+            },
+            {
+              "fieldLabel": "Pain Score (0-10)",
+              "fieldType": "number",
+              "requiredField": true,
+              "placeholder": "0 = no pain, 10 = worst pain"
+            },
+            {
+              "fieldLabel": "How are you feeling? Describe any symptoms",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Describe how you feel, any symptoms, pain changes, or concerns..."
+            },
+            {
+              "fieldLabel": "Temperature (°C, if measured)",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "e.g. 37.2"
+            }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "form-post-visit",
+      "name": "📋 Post-Visit: Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        1150
+      ],
+      "webhookId": "form-post-visit-checkin",
+      "notes": "Pain, temp, symptoms",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post-visit-checkin",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-post-visit",
+      "name": "🌐 Post-Visit: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1330
+      ],
+      "webhookId": "post-visit-checkin",
+      "notes": "REST API check-in",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟢 POST-VISIT AGENT — Input Validation & Normalization\n// ============================================================\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  let data = item.json;\n  // --- UNWRAP WEBHOOK DATA ---\n  // Webhook wraps POST body in {headers, body, params, ...}; form triggers send flat data\n  if (data.body && data.webhookUrl) { data = data.body; }\n\n  const now = new Date().toISOString();\n  \n  // Normalize input\n  let patientId = data.patientId || data['Patient ID'] || '';\n  let visitId = data.visitId || data['Visit ID'] || '';\n  let painScore = data.painScore ?? data['Pain Score (0-10)'] ?? null;\n  let freeTextResponse = data.freeTextResponse || data['How are you feeling? Describe any symptoms'] || '';\n  let temperature = data.temperature || data.temperatureReported || data['Temperature (°C, if measured)'] || null;\n  \n  // Parse numeric values\n  if (painScore !== null && painScore !== undefined) {\n    painScore = parseInt(painScore, 10);\n    if (isNaN(painScore)) painScore = null;\n  }\n  if (temperature !== null && temperature !== undefined && temperature !== '') {\n    temperature = parseFloat(temperature);\n    if (isNaN(temperature)) temperature = null;\n  } else {\n    temperature = null;\n  }\n\n  // Validate\n  const errors = [];\n  if (!patientId) errors.push('patientId is required');\n  if (!visitId) errors.push('visitId is required');\n  if (painScore === null || painScore === undefined) errors.push('painScore is required (0-10)');\n  if (painScore !== null && (painScore < 0 || painScore > 10)) errors.push('painScore must be between 0 and 10');\n  if (!freeTextResponse || freeTextResponse.trim().length === 0) errors.push('symptom description is required');\n\n  results.push({\n    json: {\n      patientId,\n      visitId,\n      painScore,\n      freeTextResponse: freeTextResponse.trim(),\n      temperatureReported: temperature,\n      validationErrors: errors,\n      isValid: errors.length === 0,\n      checkId: 'PVC-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0'),\n      checkInTime: now\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "postvisit-validate",
+      "name": "🟢 Post-Visit: Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        1235
+      ],
+      "notes": "Pain and temp check",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "postvisit-valid-check",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "postvisit-if-valid",
+      "name": "🟢 Post-Visit: Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        1235
+      ],
+      "notes": "Valid or invalid route",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 1024,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a medical red-flag classifier for post-visit patient check-ins. Analyze the patient's message and return a JSON object with these exact fields:\\n\\n{\\n  \\\"redFlagsDetected\\\": boolean,\\n  \\\"flags\\\": [\\n    {\\n      \\\"category\\\": \\\"worsening-pain\\\" | \\\"bleeding\\\" | \\\"shortness-of-breath\\\" | \\\"high-fever\\\" | \\\"medication-side-effect\\\",\\n      \\\"matchedPhrase\\\": \\\"exact phrase from patient text\\\",\\n      \\\"confidence\\\": 0.0-1.0,\\n      \\\"severity\\\": \\\"mild\\\" | \\\"moderate\\\" | \\\"severe\\\"\\n    }\\n  ],\\n  \\\"extractedSymptoms\\\": [\\n    {\\n      \\\"symptom\\\": \\\"name\\\",\\n      \\\"severity\\\": \\\"mild\\\" | \\\"moderate\\\" | \\\"severe\\\",\\n      \\\"description\\\": \\\"brief description\\\"\\n    }\\n  ],\\n  \\\"overallAssessment\\\": \\\"normal\\\" | \\\"concerning\\\" | \\\"urgent\\\" | \\\"emergency\\\",\\n  \\\"reasoning\\\": \\\"brief clinical reasoning\\\"\\n}\\n\\nRed-flag categories to detect:\\n1. Worsening pain — escalating, getting worse, unbearable\\n2. Bleeding — any bleeding, blood, hemorrhage, spotting\\n3. Shortness of breath — can't breathe, difficulty breathing, breathless, gasping\\n4. High fever — temperature above 38.5°C, burning up, very hot\\n5. Medication side effects — rash, dizziness, nausea from medication, allergic reaction, adverse effect\\n\\nBe thorough: detect red flags even if embedded within long normal text. A single concerning phrase in 200 words of normal text should still be flagged.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Patient pain score: {{ $json.painScore }}/10. Temperature: {{ $json.temperatureReported || 'not reported' }}°C. Patient message: {{ $json.freeTextResponse }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "postvisit-nlp",
+      "name": "🟢 Post-Visit: Red-Flag NLP (Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        1150
+      ],
+      "notes": "AI red-flag scan",
+      "onError": "continueErrorOutput",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟢 POST-VISIT — Process NLP Results & Escalation Decision\n// ============================================================\n\nconst nlpResponse = $input.first().json;\nconst prevData = $('🟢 Post-Visit: Validate Input').first().json;\nconst now = new Date().toISOString();\n\n// Parse NLP result\nlet nlpResult;\ntry {\n  const content = nlpResponse.choices?.[0]?.message?.content || '{}';\n  nlpResult = JSON.parse(content);\n} catch(e) {\n  // LLM failure fallback — escalate to manual review\n  nlpResult = {\n    redFlagsDetected: false,\n    flags: [],\n    extractedSymptoms: [],\n    overallAssessment: 'normal',\n    reasoning: 'LLM parse error — manual review recommended'\n  };\n}\n\nconst painScore = prevData.painScore;\nconst temperature = prevData.temperatureReported;\nconst patientId = prevData.patientId;\nconst visitId = prevData.visitId;\nconst freeText = prevData.freeTextResponse;\nconst checkId = prevData.checkId;\n\n// --- ADDITIONAL RULES ENGINE CHECKS ---\n\n// High fever check (rules engine, not LLM)\nif (temperature !== null && temperature > 38.5) {\n  if (!nlpResult.flags) nlpResult.flags = [];\n  const alreadyHasFever = nlpResult.flags.some(f => f.category === 'high-fever');\n  if (!alreadyHasFever) {\n    nlpResult.redFlagsDetected = true;\n    nlpResult.flags.push({\n      category: 'high-fever',\n      matchedPhrase: `temperature ${temperature}°C`,\n      confidence: 1.0,\n      severity: 'severe'\n    });\n  }\n}\n\n// High pain score check (rules engine)\nconst highPain = painScore >= 7;\n\n// Pain-text conflict detection\nconst minimizingPhrases = ['fine', 'okay', 'not bad', 'alright', 'no problem', 'manageable', 'it\\'s nothing', 'don\\'t worry'];\nconst textLower = freeText.toLowerCase();\nconst isMinimizing = minimizingPhrases.some(phrase => textLower.includes(phrase));\nconst conflictDetected = highPain && isMinimizing;\n\n// Determine escalation\nlet escalationType = 'none';\nlet assignedTo = null;\nlet slaMins = 0;\nlet escalationReason = '';\n\nconst hasBreathingFlag = nlpResult.flags?.some(f => f.category === 'shortness-of-breath');\nconst hasBleedingFlag = nlpResult.flags?.some(f => f.category === 'bleeding' && f.severity === 'severe');\n\nif (hasBreathingFlag || hasBleedingFlag) {\n  escalationType = 'emergency';\n  assignedTo = 'emergency-services';\n  slaMins = 5;\n  escalationReason = `Emergency red flag: ${hasBreathingFlag ? 'shortness of breath' : 'severe bleeding'} detected`;\n} else if (nlpResult.redFlagsDetected || highPain || conflictDetected) {\n  escalationType = 'clinical';\n  slaMins = 60;\n  \n  const hasMedSideEffect = nlpResult.flags?.some(f => f.category === 'medication-side-effect');\n  if (hasMedSideEffect) {\n    assignedTo = 'prescribing-doctor';\n    escalationReason = 'Medication side effect detected — escalated to prescribing doctor';\n  } else if (temperature && temperature > 38.5) {\n    assignedTo = 'physician';\n    escalationReason = `Fever ${temperature}°C above threshold — escalated to physician`;\n  } else if (conflictDetected) {\n    assignedTo = 'clinical-team';\n    escalationReason = `Pain score conflict: patient scores ${painScore}/10 but uses minimizing language. Escalated despite patient dismissal.`;\n  } else {\n    assignedTo = 'clinical-team';\n    escalationReason = `Red flags detected: ${nlpResult.flags?.map(f => f.category).join(', ')}`;\n  }\n}\n\n// --- ESCALATION DEDUPLICATION ---\nlet escalationDeduplicated = false;\nlet dedupKey = '';\nif (escalationType !== 'none') {\n  const dateStr = new Date().toISOString().split('T')[0];\n  dedupKey = `post-visit|${patientId}|${dateStr}`;\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.escalationKeys) staticData.escalationKeys = {};\n  if (staticData.escalationKeys[dedupKey]) {\n    escalationDeduplicated = true;\n  } else {\n    staticData.escalationKeys[dedupKey] = now;\n  }\n}\n\n// --- BUILD PROACTIVE CHECK-IN (for non-escalated) ---\nlet proactiveCheckIn = null;\nif (escalationType === 'none') {\n  proactiveCheckIn = {\n    taskId: `CI-${visitId}-${Date.now()}`,\n    scheduledAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),\n    channel: 'sms',\n    escalationIfNoResponse: {\n      waitHours: 48,\n      action: 'escalate-to-nurse'\n    }\n  };\n}\n\n// --- MULTI-TURN CONVERSATION STATE MANAGEMENT ---\nconst conversationStaticData = $getWorkflowStaticData('global');\nif (!conversationStaticData.conversations) conversationStaticData.conversations = {};\n\nconst conversationKey = `conv|${patientId}|${visitId}`;\nlet existingConversation = conversationStaticData.conversations[conversationKey];\nlet turnNumber = 1;\n\nif (existingConversation) {\n  turnNumber = existingConversation.turnNumber + 1;\n  if (turnNumber > 5) turnNumber = 5; // Max 5 turns\n}\n\n// Store state after escalation is determined\nconversationStaticData.conversations[conversationKey] = {\n  turnNumber: turnNumber,\n  lastCheckinAt: now,\n  lastPainScore: painScore,\n  escalated: escalationType !== 'none'\n};\n\n// --- CONVERSATION LOG ---\nconst conversationLog = {\n  sessionId: `SESSION-${visitId}-${Date.now()}`,\n  turnNumber: turnNumber,\n  maxTurns: 5,\n  previousTurns: turnNumber > 1 ? turnNumber - 1 : 0,\n  isFollowUp: turnNumber > 1,\n  entries: [\n    {\n      role: 'patient',\n      content: freeText,\n      timestamp: now,\n      intent: 'symptom-report',\n      painScore: painScore\n    }\n  ]\n};\n\n// --- AUDIT LOG ---\nconst auditLog = [\n  {\n    event: 'POST_VISIT_CHECK_IN_RECEIVED',\n    timestamp: now,\n    agent: 'post-visit',\n    checkId: checkId,\n    patientId: patientId,\n    visitId: visitId,\n    painScore: painScore\n  }\n];\n\nif (nlpResult.redFlagsDetected) {\n  auditLog.push({\n    event: 'RED_FLAG_DETECTED',\n    timestamp: now,\n    agent: 'post-visit',\n    checkId: checkId,\n    flags: nlpResult.flags?.map(f => f.category),\n    confidence: nlpResult.flags?.map(f => f.confidence)\n  });\n}\n\nif (conflictDetected) {\n  auditLog.push({\n    event: 'PAIN_SCORE_CONFLICT_DETECTED',\n    timestamp: now,\n    agent: 'post-visit',\n    painScore: painScore,\n    minimizingText: true\n  });\n}\n\nif (escalationType !== 'none' && !escalationDeduplicated) {\n  auditLog.push({\n    event: 'ESCALATION_CREATED',\n    timestamp: now,\n    agent: 'post-visit',\n    type: escalationType,\n    assignedTo: assignedTo,\n    reason: escalationReason\n  });\n}\n\nif (escalationDeduplicated) {\n  auditLog.push({\n    event: 'ESCALATION_DEDUP_BLOCKED',\n    timestamp: now,\n    agent: 'post-visit',\n    dedupKey: dedupKey\n  });\n}\n\nif (proactiveCheckIn) {\n  auditLog.push({\n    event: 'PROACTIVE_CHECKIN_SCHEDULED',\n    timestamp: now,\n    agent: 'post-visit',\n    taskId: proactiveCheckIn.taskId,\n    scheduledAt: proactiveCheckIn.scheduledAt\n  });\n}\n\nconst result = {\n  checkId: checkId,\n  patientId: patientId,\n  visitId: visitId,\n  painScore: painScore,\n  temperatureReported: temperature,\n  freeTextResponse: freeText,\n  nlpClassification: {\n    redFlagsDetected: nlpResult.redFlagsDetected || false,\n    flags: nlpResult.flags || [],\n    extractedSymptoms: nlpResult.extractedSymptoms || [],\n    overallAssessment: nlpResult.overallAssessment,\n    reasoning: nlpResult.reasoning\n  },\n  conflictDetected: conflictDetected,\n  escalation: {\n    triggered: escalationType !== 'none',\n    type: escalationType,\n    assignedTo: assignedTo,\n    deduplicated: escalationDeduplicated,\n    slaDeadline: slaMins > 0 ? new Date(Date.now() + slaMins * 60 * 1000).toISOString() : null,\n    reason: escalationReason\n  },\n  conversationLog: conversationLog,\n  proactiveCheckIn: proactiveCheckIn,\n  status: escalationType !== 'none' ? 'escalated' : 'responded',\n  message: escalationType === 'emergency'\n    ? `⚠️ EMERGENCY: ${escalationReason}. Emergency services notified. SLA: 5 minutes. Please remain calm and seek immediate help if needed.`\n    : escalationType === 'clinical'\n    ? `⚠️ CLINICAL ALERT: ${escalationReason}. Your care team has been notified and will follow up within 1 hour.`\n    : `✅ Thank you for your check-in. Your recovery appears to be progressing normally. We will check in again in 48 hours. If your condition changes, please contact us immediately.`,\n  auditLog: auditLog\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "postvisit-process",
+      "name": "🟢 Post-Visit: Process & Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        1150
+      ],
+      "notes": "Fever and pain rules",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Post-Visit validation error response\nconst data = $input.first().json;\nreturn [{\n  json: {\n    status: 'validation_error',\n    message: 'Post-visit check-in failed validation: ' + data.validationErrors.join('; '),\n    errors: data.validationErrors,\n    auditLog: [{\n      event: 'POST_VISIT_VALIDATION_FAILED',\n      timestamp: new Date().toISOString(),\n      agent: 'post-visit',\n      errors: data.validationErrors\n    }]\n  }\n}];"
+      },
+      "id": "postvisit-invalid",
+      "name": "🟢 Post-Visit: Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        1330
+      ],
+      "notes": "Field error details",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "formTitle": "🟠 Billing & Insurance Inquiry",
+        "formDescription": "Billing & Insurance Inquiry — Submit claims, check coverage, detect duplicates, and resolve billing questions.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Patient ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "PAT-00000011"
+            },
+            {
+              "fieldLabel": "Visit ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "VIS-00000011"
+            },
+            {
+              "fieldLabel": "Treatment Codes (comma-separated)",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "CONS01, LAB03"
+            },
+            {
+              "fieldLabel": "Invoice Amount (MYR)",
+              "fieldType": "number",
+              "requiredField": true,
+              "placeholder": "250.00"
+            },
+            {
+              "fieldLabel": "Invoice Date",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "YYYY-MM-DD"
+            },
+            {
+              "fieldLabel": "Insurance Policy ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "POL-MY-20230415"
+            },
+            {
+              "fieldLabel": "Policy Expiry Date",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "YYYY-MM-DD"
+            },
+            {
+              "fieldLabel": "Covered Codes (comma-separated)",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "CONS01, LAB03, XRAY01"
+            },
+            {
+              "fieldLabel": "Billing Question (optional)",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "Ask about billing status, copay, refund, etc."
+            },
+            {
+              "fieldLabel": "Manual Override Code (optional)",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "MGR-APPROVE, EXEC-WAIVER, etc."
+            },
+            {
+              "fieldLabel": "Override Justification (required if override)",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "Documented reason for manual override..."
+            }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "form-billing",
+      "name": "📋 Billing: Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        2200
+      ],
+      "webhookId": "form-billing-inquiry",
+      "notes": "Billing inquiry form",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "billing-inquiry",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-billing",
+      "name": "🌐 Billing: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        2380
+      ],
+      "webhookId": "billing-inquiry",
+      "notes": "REST API billing",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "formTitle": "🟣 Retention — Patient Re-Engagement Scan",
+        "formDescription": "Patient Retention Scan — Identifies inactive patients and generates consent-safe re-engagement outreach.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Patient ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "PAT-00000015"
+            },
+            {
+              "fieldLabel": "Patient Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "Ahmad bin Hassan"
+            },
+            {
+              "fieldLabel": "Last Visit Date",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "YYYY-MM-DD"
+            },
+            {
+              "fieldLabel": "Condition/Diagnosis",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "e.g. diabetes, hypertension, wellness checkup"
+            },
+            {
+              "fieldLabel": "Messaging Consent",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "true"
+                  },
+                  {
+                    "option": "false"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Unresolved Clinical Issue",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "false"
+                  },
+                  {
+                    "option": "true"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Unresolved Billing Issue",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "false"
+                  },
+                  {
+                    "option": "true"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Contacts This Month",
+              "fieldType": "number",
+              "requiredField": true,
+              "placeholder": "0"
+            }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "form-retention",
+      "name": "📋 Retention: Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        3250
+      ],
+      "webhookId": "form-retention-scan",
+      "notes": "Re-engagement input",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retention-scan",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-retention",
+      "name": "🌐 Retention: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        3430
+      ],
+      "webhookId": "retention-scan",
+      "notes": "REST API retention",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "formTitle": "🔴 Clinical Triage — Symptom Assessment",
+        "formDescription": "Clinical Symptom Triage — Describes symptoms for AI-powered urgency classification with safety guardrails.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Patient ID",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "PAT-00000019"
+            },
+            {
+              "fieldLabel": "Describe your symptoms",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Describe what you are experiencing in detail (e.g., headache for 2 days, chest pain, difficulty breathing...)"
+            },
+            {
+              "fieldLabel": "How long have you had these symptoms?",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "e.g., 2 days, since this morning, 1 week"
+            },
+            {
+              "fieldLabel": "Any medications currently taking?",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "e.g., Paracetamol, Metformin"
+            }
+          ]
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "form-triage",
+      "name": "📋 Triage: Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        4300
+      ],
+      "webhookId": "form-clinical-triage",
+      "notes": "Symptom text entry",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinical-triage",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-triage",
+      "name": "🌐 Triage: Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        4480
+      ],
+      "webhookId": "clinical-triage",
+      "notes": "REST API triage",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔴 CLINICAL TRIAGE — Emergency Keyword Scanner\n// ============================================================\n// SAFETY-CRITICAL: Emergency keywords MUST bypass the LLM\n// for zero-delay deterministic escalation. This is the\n// highest-risk component — no AI latency on emergencies.\n// ============================================================\n\nlet data = $input.first().json;\n// --- UNWRAP WEBHOOK DATA ---\n// Webhook wraps POST body in {headers, body, params, ...}; form triggers send flat data\nif (data.body && data.webhookUrl) { data = data.body; }\n\nconst now = new Date().toISOString();\n\n// Normalize input\nlet patientId = data.patientId || data['Patient ID'] || '';\nlet message = data.message || data['Describe your symptoms'] || '';\nlet duration = data.duration || data['How long have you had these symptoms?'] || '';\nlet medications = data.medications || data['Any medications currently taking?'] || '';\n\nconst messageLower = message.toLowerCase();\n\n// --- EMERGENCY KEYWORD LIST ---\nconst emergencyKeywords = [\n  // Cardiac\n  'heart attack', 'chest pain', 'having a heart attack',\n  // Respiratory\n  'can\\'t breathe', 'cant breathe', 'cannot breathe',\n  'difficulty breathing', 'not breathing', 'shortness of breath',\n  // Neurological\n  'unconscious', 'unresponsive', 'collapsed', 'losing consciousness',\n  'stroke', 'seizure', 'can\\'t feel my',\n  // Trauma / Bleeding\n  'severe bleeding', 'choking',\n  // Toxicological\n  'overdose', 'poisoning',\n  // Allergic\n  'anaphylaxis', 'allergic reaction', 'throat closing',\n  'swelling throat', 'can\\'t swallow',\n  // Other critical\n  'severe abdominal pain', 'vomiting blood', 'coughing blood',\n  'severe head injury', 'head trauma', 'drowning',\n  'suicidal', 'self harm', 'want to die'\n];\n\nlet emergencyDetected = false;\nlet matchedKeywords = [];\n\nfor (const keyword of emergencyKeywords) {\n  if (messageLower.includes(keyword)) {\n    emergencyDetected = true;\n    matchedKeywords.push(keyword);\n  }\n}\n\nreturn [{\n  json: {\n    patientId: patientId,\n    message: message,\n    duration: duration,\n    medications: medications,\n    emergencyDetected: emergencyDetected,\n    matchedKeywords: matchedKeywords,\n    timestamp: now\n  }\n}];"
+      },
+      "id": "triage-emergency-scan",
+      "name": "🔴 Triage: Emergency Scanner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        4385
+      ],
+      "notes": "30 keyword scan first",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "triage-emergency-check",
+              "leftValue": "={{ $json.emergencyDetected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "triage-if-emergency",
+      "name": "🔴 Triage: Emergency?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        4385
+      ],
+      "notes": "Keyword skips AI step",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔴 TRIAGE — IMMEDIATE EMERGENCY ESCALATION\n// ============================================================\n// Zero-delay. No LLM. Deterministic. Immediate.\n// ============================================================\n\nconst data = $input.first().json;\nconst now = new Date().toISOString();\n\nconst ticketId = 'ESC-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\nconst alertId = 'ALT-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n\nconst DISCLAIMER = '\\n\\n⚠️ IMPORTANT DISCLAIMER: This system does not provide medical diagnoses. The information above is for guidance only. Please follow the instructions of emergency medical services. If you are in immediate danger, call 999 now.';\n\nreturn [{\n  json: {\n    status: 'EMERGENCY',\n    classification: 'Emergency',\n    message: `🚨 EMERGENCY DETECTED: Keywords matched: [${data.matchedKeywords.join(', ')}]. Emergency services must be contacted IMMEDIATELY. Please call 999 or go to your nearest emergency department NOW. Do not delay.${DISCLAIMER}`,\n    patientId: data.patientId,\n    originalMessage: data.message,\n    emergencyKeywords: data.matchedKeywords,\n    escalation: {\n      triggered: true,\n      type: 'emergency-services',\n      assignedTo: 'emergency-services',\n      priority: 'critical',\n      slaDeadline: new Date(Date.now() + 5 * 60 * 1000).toISOString(),\n      ticketId: ticketId,\n      alertId: alertId\n    },\n    disclaimer: 'This system does not provide medical diagnoses. This is guidance only. For emergencies, call 999.',\n    auditLog: [\n      {\n        event: 'TRIAGE_EMERGENCY',\n        timestamp: now,\n        agent: 'clinical-triage',\n        patientId: data.patientId,\n        matchedKeywords: data.matchedKeywords,\n        action: 'IMMEDIATE_ESCALATION',\n        ticketId: ticketId\n      }\n    ]\n  }\n}];"
+      },
+      "id": "triage-emergency-response",
+      "name": "🔴 Triage: Emergency Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        4300
+      ],
+      "notes": "Emergency room alert",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 1024,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a medical triage classifier. YOU MUST NOT diagnose conditions or provide definitive medical advice. YOU MUST provide guidance only with appropriate disclaimers.\\n\\nAnalyze the patient's symptoms and return a JSON object with these exact fields:\\n\\n{\\n  \\\"classification\\\": \\\"Emergency\\\" | \\\"Same-Day\\\" | \\\"Routine\\\" | \\\"Insufficient\\\",\\n  \\\"confidence\\\": 0.0-1.0,\\n  \\\"reasoning\\\": \\\"brief clinical reasoning for classification\\\",\\n  \\\"guidance\\\": \\\"safe, non-diagnostic guidance for the patient\\\",\\n  \\\"followUpQuestions\\\": [\\\"question1\\\", \\\"question2\\\"],\\n  \\\"suggestedAction\\\": \\\"what the patient should do next\\\",\\n  \\\"redFlags\\\": [\\\"any concerning symptoms identified\\\"]\\n}\\n\\nClassification criteria:\\n- Emergency: Life-threatening symptoms requiring immediate medical attention (chest pain, difficulty breathing, severe bleeding, loss of consciousness, stroke symptoms)\\n- Same-Day: Symptoms that need medical attention today but are not immediately life-threatening (high fever, moderate pain, infection signs, worsening symptoms)\\n- Routine: Mild symptoms that can wait for a scheduled appointment (mild headache, minor aches, routine follow-up questions)\\n- Insufficient: Not enough information provided — you MUST ask follow-up questions before classifying\\n\\nCRITICAL RULES:\\n1. NEVER diagnose — only classify urgency\\n2. NEVER give definitive medical advice\\n3. If information is missing or ambiguous, classify as 'Insufficient' and provide structured follow-up questions\\n4. Always err on the side of caution — when in doubt, classify higher urgency\\n5. Include follow-up questions for EVERY classification to gather more info\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Patient symptoms: {{ $json.message }}. Duration: {{ $json.duration || 'not specified' }}. Current medications: {{ $json.medications || 'none reported' }}.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "triage-llm",
+      "name": "🔴 Triage: LLM Classifier (Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        4480
+      ],
+      "notes": "AI 4-level classify",
+      "onError": "continueErrorOutput",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🔴 TRIAGE — Process LLM Classification Result\n// ============================================================\n\nconst llmResponse = $input.first().json;\nconst prevData = $('🔴 Triage: Emergency Scanner').first().json;\nconst now = new Date().toISOString();\n\nconst DISCLAIMER = '\\n\\n⚠️ IMPORTANT DISCLAIMER: This system does not provide medical diagnoses. The information above is for guidance only and should not replace professional medical advice. If your symptoms worsen or you feel your condition is an emergency, please call 999 or visit the nearest emergency department immediately.';\n\n// Parse LLM result\nlet llmResult;\ntry {\n  const content = llmResponse.choices?.[0]?.message?.content || '{}';\n  llmResult = JSON.parse(content);\n} catch(e) {\n  llmResult = {\n    classification: 'Insufficient',\n    confidence: 0,\n    reasoning: 'Unable to parse LLM response — defaulting to Insufficient for safety',\n    guidance: 'We could not fully assess your symptoms. Please provide more details or contact our clinic directly.',\n    followUpQuestions: ['Can you describe your symptoms in more detail?', 'When did the symptoms start?', 'Have you taken any medication?'],\n    suggestedAction: 'Please contact our clinic directly for assistance.',\n    redFlags: []\n  };\n}\n\nconst classification = llmResult.classification || 'Insufficient';\nconst auditLog = [];\n\n// Build response based on classification\nlet escalation = { triggered: false };\nlet message = '';\n\nif (classification === 'Emergency') {\n  const ticketId = 'ESC-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n  escalation = {\n    triggered: true,\n    type: 'emergency-services',\n    assignedTo: 'emergency-services',\n    priority: 'critical',\n    slaDeadline: new Date(Date.now() + 5 * 60 * 1000).toISOString(),\n    ticketId: ticketId\n  };\n  message = `🚨 URGENT: Based on your symptoms, this may require emergency medical attention. Please call 999 or go to your nearest emergency department immediately. ${llmResult.guidance || ''}${DISCLAIMER}`;\n  \n  auditLog.push({\n    event: 'TRIAGE_EMERGENCY',\n    timestamp: now,\n    agent: 'clinical-triage',\n    patientId: prevData.patientId,\n    classification: 'Emergency',\n    llmBased: true\n  });\n} else if (classification === 'Same-Day') {\n  message = `⚡ Your symptoms suggest you should see a doctor today. ${llmResult.guidance || 'Please book a same-day appointment at our clinic.'} ${llmResult.suggestedAction || ''}${DISCLAIMER}`;\n  \n  auditLog.push({\n    event: 'TRIAGE_CLASSIFIED',\n    timestamp: now,\n    agent: 'clinical-triage',\n    patientId: prevData.patientId,\n    classification: 'Same-Day',\n    confidence: llmResult.confidence\n  });\n} else if (classification === 'Routine') {\n  message = `📋 Your symptoms appear to be routine. ${llmResult.guidance || 'We recommend booking an appointment at your next available convenience.'} ${llmResult.suggestedAction || ''}${DISCLAIMER}`;\n  \n  auditLog.push({\n    event: 'TRIAGE_CLASSIFIED',\n    timestamp: now,\n    agent: 'clinical-triage',\n    patientId: prevData.patientId,\n    classification: 'Routine',\n    confidence: llmResult.confidence\n  });\n} else {\n  // Insufficient\n  message = `❓ We need more information to properly assess your symptoms. Please answer the following questions:\\n\\n${(llmResult.followUpQuestions || []).map((q, i) => `${i+1}. ${q}`).join('\\n')}\\n\\n${llmResult.guidance || 'Once you provide more details, we can better assist you.'}${DISCLAIMER}`;\n  \n  auditLog.push({\n    event: 'TRIAGE_FOLLOWUP_QUESTIONS',\n    timestamp: now,\n    agent: 'clinical-triage',\n    patientId: prevData.patientId,\n    classification: 'Insufficient',\n    questionsAsked: llmResult.followUpQuestions?.length || 0\n  });\n}\n\nreturn [{\n  json: {\n    status: classification === 'Emergency' ? 'EMERGENCY' : classification.toUpperCase(),\n    classification: classification,\n    message: message,\n    patientId: prevData.patientId,\n    originalMessage: prevData.message,\n    llmAnalysis: {\n      classification: llmResult.classification,\n      confidence: llmResult.confidence,\n      reasoning: llmResult.reasoning,\n      guidance: llmResult.guidance,\n      followUpQuestions: llmResult.followUpQuestions || [],\n      suggestedAction: llmResult.suggestedAction,\n      redFlags: llmResult.redFlags || []\n    },\n    escalation: escalation,\n    disclaimer: 'This system does not provide medical diagnoses. This is guidance only. For emergencies, call 999.',\n    auditLog: auditLog\n  }\n}];"
+      },
+      "id": "triage-process",
+      "name": "🔴 Triage: Process & Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        4480
+      ],
+      "notes": "4 urgency actions",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// LLM API Error Fallback - escalate to manual review\nconst input = $input.first().json;\nconst error = input.error || input.message || 'Groq API unavailable';\nconst painScore = parseInt(input.painScore) || 0;\n\nreturn [{\n  json: {\n    status: 'llm-error-fallback',\n    action: 'manual-review-required',\n    originalInput: {\n      patientId: input.patientId || 'unknown',\n      visitId: input.visitId || 'unknown',\n      painScore: painScore,\n      freeTextResponse: input.freeTextResponse || ''\n    },\n    fallbackDecision: {\n      escalate: (painScore >= 7),\n      reason: painScore >= 7\n        ? 'LLM unavailable but high pain score detected - escalating as precaution'\n        : 'LLM unavailable - routing to manual clinical review',\n      assignedTo: painScore >= 7 ? 'clinical-team' : 'manual-review-queue',\n      slaMinutes: painScore >= 7 ? 60 : 240,\n    },\n    error: {\n      type: 'LLM_API_FAILURE',\n      message: String(error).substring(0, 500),\n      timestamp: new Date().toISOString()\n    },\n    auditLog: {\n      event: 'LLM_FALLBACK_TRIGGERED',\n      agent: 'post-visit',\n      timestamp: new Date().toISOString(),\n      details: 'Groq API call failed. Applied safe fallback: ' + (painScore >= 7 ? 'auto-escalation (high pain)' : 'manual review queue')\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        1470
+      ],
+      "id": "err-postvisit-llm",
+      "name": "🟢 Post-Visit: LLM Error Fallback",
+      "notes": "Safe fallback logic",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Triage LLM Error Fallback - safe default\nconst input = $input.first().json;\nconst error = input.error || input.message || 'Groq API unavailable';\nconst disclaimer = '\\u26a0\\ufe0f IMPORTANT DISCLAIMER: This system does not provide medical diagnoses. Always consult a qualified healthcare professional for medical advice. If you are experiencing a medical emergency, call 999 (Malaysia) or your local emergency number immediately.';\n\nreturn [{\n  json: {\n    status: 'llm-error-fallback',\n    classification: 'Same-Day',\n    action: 'manual-triage-required',\n    guidance: 'Our AI triage system is temporarily unavailable. As a safety precaution, we are classifying your case as Same-Day priority. Please visit your nearest clinic today or call our helpline for immediate assistance.',\n    disclaimer: disclaimer,\n    fallbackReason: 'LLM API unavailable - defaulting to Same-Day for patient safety',\n    assignedTo: 'triage-nurse',\n    slaMinutes: 60,\n    error: {\n      type: 'LLM_API_FAILURE',\n      message: String(error).substring(0, 500),\n      timestamp: new Date().toISOString()\n    },\n    auditLog: {\n      event: 'TRIAGE_LLM_FALLBACK',\n      agent: 'clinical-triage',\n      timestamp: new Date().toISOString(),\n      details: 'Groq API call failed. Safe fallback applied: classified as Same-Day, routed to triage nurse. Disclaimer included.'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        4620
+      ],
+      "id": "err-triage-llm",
+      "name": "🔴 Triage: LLM Error Fallback",
+      "notes": "Same-day if AI fails",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "#### Pre-Visit Intake Agent\nFlow: Form or Webhook > Validate and Score Risk > Escalation Check > Nurse Alert or Normal Response\nScores risk from 8 medical conditions, age, and smoking status on a scale of 0 to 10"
+      },
+      "id": "sticky-previsit",
+      "name": "Pre-Visit Section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        40
+      ],
+      "width": 1200,
+      "height": 120
+    },
+    {
+      "parameters": {
+        "content": "#### Post-Visit Recovery Agent\nFlow: Form or Webhook > Validate Input > Check Valid > Red-Flag Analysis > Clinical Decision\nChecks fever, pain level, symptom text conflicts, and uses Groq AI to detect danger signs"
+      },
+      "id": "sticky-postvisit",
+      "name": "Post-Visit Section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        1090
+      ],
+      "width": 1200,
+      "height": 120
+    },
+    {
+      "parameters": {
+        "content": "#### Billing and Insurance Agent\nFlow: Form or Webhook > Validate Input > Check Eligibility > Duplicate Check > Process or Block\nPrevents duplicate billing, validates insurance expiry, matches treatment codes to coverage"
+      },
+      "id": "sticky-billing",
+      "name": "Billing Section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        2140
+      ],
+      "width": 1200,
+      "height": 120
+    },
+    {
+      "parameters": {
+        "content": "#### Retention and Re-Engagement Agent\nFlow: Form or Webhook > Parse Input > Classify Patients > Check Eligibility > Outreach or Skip\nGroups patients into 5 segments, applies 5 suppression rules, generates personalized messages"
+      },
+      "id": "sticky-retention",
+      "name": "Retention Section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        3190
+      ],
+      "width": 1200,
+      "height": 120
+    },
+    {
+      "parameters": {
+        "content": "#### Clinical Triage Agent\nFlow: Form or Webhook > Emergency Keyword Scan > Emergency Check > Escalate or AI Classification\nScans 30 plus emergency keywords before AI runs, classifies into 4 urgency levels"
+      },
+      "id": "sticky-triage",
+      "name": "Triage Section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        4240
+      ],
+      "width": 1200,
+      "height": 120
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟠 BILLING AGENT — Step 1: Validate & Normalize Input\n// ============================================================\n// Handles: Webhook/form data unwrap, field normalization,\n// treatment code parsing, supporting documents, FAQ detection.\n// ============================================================\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  let data = item.json;\n  // --- UNWRAP WEBHOOK DATA ---\n  if (data.body && data.webhookUrl) { data = data.body; }\n\n  const now = new Date().toISOString();\n  const auditLog = [];\n\n  // --- NORMALIZE INPUT ---\n  let patientId = data.patientId || data['Patient ID'] || '';\n  let visitId = data.visitId || data['Visit ID'] || '';\n  let treatmentCodesRaw = data.treatmentCodes || data['Treatment Codes (comma-separated)'] || '';\n  let amount = data.amount || data['Invoice Amount (MYR)'] || 0;\n  let invoiceDate = data.invoiceDate || data['Invoice Date'] || new Date().toISOString().split('T')[0];\n  let insurancePolicyId = data.insurancePolicyId || data['Insurance Policy ID'] || '';\n  let policyExpiryDate = data.policyExpiryDate || data['Policy Expiry Date'] || '';\n  let coveredCodesRaw = data.coveredCodes || data['Covered Codes (comma-separated)'] || '';\n  let billingQuestion = data.billingQuestion || data['Billing Question (optional)'] || '';\n  let overrideCode = data.overrideCode || data['Manual Override Code (optional)'] || '';\n  let overrideJustification = data.overrideJustification || data['Override Justification (required if override)'] || '';\n\n  // Parse arrays\n  let treatmentCodes = Array.isArray(treatmentCodesRaw)\n    ? treatmentCodesRaw\n    : (typeof treatmentCodesRaw === 'string' && treatmentCodesRaw.trim()\n       ? treatmentCodesRaw.split(',').map(s => s.trim().toUpperCase())\n       : []);\n\n  let coveredCodes = Array.isArray(coveredCodesRaw)\n    ? coveredCodesRaw\n    : (typeof coveredCodesRaw === 'string' && coveredCodesRaw.trim()\n       ? coveredCodesRaw.split(',').map(s => s.trim().toUpperCase())\n       : []);\n\n  if (typeof amount === 'string') amount = parseFloat(amount) || 0;\n\n  // --- SUPPORTING DOCUMENTS ---\n  let submittedDocs = data.supportingDocuments || data['Supporting Documents (comma-separated)'] || [];\n  if (typeof submittedDocs === 'string') {\n    submittedDocs = submittedDocs.split(',').map(s => s.trim().toLowerCase().replace(/\\s+/g, '_'));\n  }\n\n  // --- FAQ ENGINE ---\n  let faqResponse = null;\n  if (billingQuestion && billingQuestion.trim().length > 0) {\n    const faqDatabase = [\n      { category: 'billing_status', keywords: ['status', 'where is my bill', 'claim status', 'invoice status', 'pending'], answer: 'Your billing claim is being processed. Most claims are resolved within 14 business days. If your claim is older than 30 days, it will be automatically escalated to a billing manager.', escalateIfUnresolved: true },\n      { category: 'copay', keywords: ['copay', 'co-pay', 'my share', 'out of pocket', 'how much do I pay'], answer: 'Your copay amount depends on your insurance plan and the treatment received. Please check your insurance policy details or contact your insurer directly for specific copay information.', escalateIfUnresolved: false },\n      { category: 'deductible', keywords: ['deductible', 'annual limit', 'coverage limit', 'maximum'], answer: 'Your deductible and coverage limits are defined in your insurance policy. Once the annual deductible is met, your insurance covers eligible treatments up to the annual maximum.', escalateIfUnresolved: false },\n      { category: 'denied_claim', keywords: ['denied', 'rejected', 'claim denied', 'not approved', 'rejection'], answer: 'If your claim was denied, please review the rejection reason provided. Common causes include: expired policy, treatment not covered, or missing documentation. You may submit an appeal with supporting documents.', escalateIfUnresolved: true },\n      { category: 'payment_options', keywords: ['payment', 'pay', 'installment', 'payment plan', 'how to pay'], answer: 'We accept cash, credit/debit card, bank transfer, and insurance claims. For large bills, installment payment plans may be available \\u2014 please speak with our billing team.', escalateIfUnresolved: false },\n      { category: 'refund', keywords: ['refund', 'overpaid', 'overcharged', 'money back', 'credit'], answer: 'Refund requests are processed within 14 business days after verification. Please provide your invoice number and the reason for the refund request. Our billing team will review and respond.', escalateIfUnresolved: true },\n      { category: 'insurance_contact', keywords: ['insurance phone', 'insurance email', 'contact insurer', 'insurance company'], answer: 'Please contact your insurance provider directly using the contact information on your insurance card. Our billing team can also assist in liaising with your insurer if needed.', escalateIfUnresolved: false },\n      { category: 'general_billing', keywords: ['bill', 'charge', 'cost', 'fee', 'price', 'receipt', 'statement'], answer: 'For general billing inquiries, please provide your Patient ID and Visit ID. Our billing system tracks all charges by visit. Itemized statements are available upon request.', escalateIfUnresolved: false }\n    ];\n\n    const questionLower = billingQuestion.toLowerCase();\n    let bestMatch = null;\n    let bestScore = 0;\n\n    for (const faq of faqDatabase) {\n      const matchCount = faq.keywords.filter(kw => questionLower.includes(kw)).length;\n      if (matchCount > bestScore) {\n        bestScore = matchCount;\n        bestMatch = faq;\n      }\n    }\n\n    if (bestMatch) {\n      faqResponse = {\n        category: bestMatch.category,\n        answer: bestMatch.answer,\n        matched: true,\n        escalateIfUnresolved: bestMatch.escalateIfUnresolved\n      };\n    } else {\n      faqResponse = {\n        category: 'unmatched',\n        answer: 'Your billing question has been noted. A billing specialist will review and respond within 24 hours.',\n        matched: false,\n        escalateIfUnresolved: true\n      };\n    }\n\n    auditLog.push({\n      event: 'BILLING_FAQ_RESPONSE',\n      timestamp: now,\n      agent: 'billing',\n      category: faqResponse.category,\n      matched: faqResponse.matched,\n      question: billingQuestion.substring(0, 200)\n    });\n  }\n\n  auditLog.push({\n    event: 'BILLING_RECEIVED',\n    timestamp: now,\n    agent: 'billing',\n    patientId: patientId,\n    visitId: visitId\n  });\n\n  results.push({\n    json: {\n      patientId, visitId, treatmentCodes, amount, invoiceDate,\n      insurancePolicyId, policyExpiryDate, coveredCodes,\n      billingQuestion, overrideCode, overrideJustification,\n      submittedDocs, faqResponse, auditLog, _timestamp: now\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "billing-validate-input",
+      "name": "🟠 Billing: Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        2285
+      ],
+      "notes": "Code and query parse",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟠 BILLING AGENT — Step 2: Eligibility & Duplicate Check\n// ============================================================\n// Handles: Idempotency (duplicate invoice detection),\n// insurance expiry validation, documentation requirements,\n// SLA tracking (>30 days auto-escalation).\n// ============================================================\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  const now = data._timestamp;\n  const auditLog = [...(data.auditLog || [])];\n\n  // --- MISSING DOCUMENTATION DETECTION ---\n  const documentationRequirements = {\n    'CONS': ['consultation_notes'],\n    'LAB':  ['lab_request', 'lab_results'],\n    'XRAY': ['imaging_request', 'imaging_report'],\n    'SURG': ['surgical_consent', 'pre_op_assessment', 'discharge_summary'],\n    'PHYS': ['therapy_plan'],\n    'PRESC': ['prescription'],\n    'PROC': ['procedure_notes', 'consent_form']\n  };\n\n  let missingDocuments = [];\n  let documentationComplete = true;\n\n  for (const code of data.treatmentCodes) {\n    const prefix = code.replace(/[0-9]/g, '');\n    const requiredDocs = documentationRequirements[prefix] || [];\n    for (const doc of requiredDocs) {\n      if (!data.submittedDocs.includes(doc)) {\n        missingDocuments.push({ treatmentCode: code, requiredDocument: doc, description: doc.replace(/_/g, ' ') });\n        documentationComplete = false;\n      }\n    }\n  }\n\n  if (!documentationComplete) {\n    auditLog.push({\n      event: 'MISSING_DOCUMENTATION_DETECTED',\n      timestamp: now,\n      agent: 'billing',\n      missingDocuments: missingDocuments,\n      treatmentCodes: data.treatmentCodes,\n      message: 'Required supporting documents are missing for one or more treatment codes.'\n    });\n  }\n\n  // --- INSURANCE EXPIRY VALIDATION ---\n  let insuranceExpired = false;\n  let insuranceErrors = [];\n\n  if (data.policyExpiryDate) {\n    const expiryDate = new Date(data.policyExpiryDate);\n    const today = new Date();\n    today.setHours(0, 0, 0, 0);\n\n    if (expiryDate < today) {\n      insuranceExpired = true;\n      insuranceErrors.push(`Insurance policy ${data.insurancePolicyId} expired on ${data.policyExpiryDate}. Claim cannot be processed against expired policy.`);\n      auditLog.push({\n        event: 'INSURANCE_EXPIRED_DETECTED',\n        timestamp: now,\n        agent: 'billing',\n        policyId: data.insurancePolicyId,\n        expiryDate: data.policyExpiryDate\n      });\n    }\n  }\n\n  // --- SLA TRACKING ---\n  const invoiceDateObj = new Date(data.invoiceDate);\n  const daysOutstanding = Math.floor((new Date() - invoiceDateObj) / (1000 * 60 * 60 * 24));\n  const slaBreached = daysOutstanding > 30;\n\n  let billingEscalation = null;\n  if (slaBreached) {\n    billingEscalation = {\n      triggered: true,\n      type: 'billing-manager',\n      assignedTo: 'billing-manager',\n      reason: `Claim outstanding for ${daysOutstanding} days (SLA threshold: 30 days). Auto-escalated to billing manager.`,\n      slaDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()\n    };\n    auditLog.push({\n      event: 'SLA_BREACH_DETECTED',\n      timestamp: now,\n      agent: 'billing',\n      daysOutstanding: daysOutstanding,\n      assignedTo: 'billing-manager'\n    });\n  }\n\n  // --- IDEMPOTENCY / DUPLICATE DETECTION ---\n  const sortedCodes = [...data.treatmentCodes].sort().join('|');\n  const idempotencyKey = `${data.patientId}|${data.visitId}|${sortedCodes}|${data.invoiceDate}`;\n\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.invoiceKeys) staticData.invoiceKeys = {};\n\n  let isDuplicate = false;\n  let existingInvoiceId = null;\n\n  if (staticData.invoiceKeys[idempotencyKey]) {\n    isDuplicate = true;\n    existingInvoiceId = staticData.invoiceKeys[idempotencyKey];\n    auditLog.push({\n      event: 'DUPLICATE_INVOICE_BLOCKED',\n      timestamp: now,\n      agent: 'billing',\n      idempotencyKey: idempotencyKey,\n      existingInvoiceId: existingInvoiceId\n    });\n  }\n\n  results.push({\n    json: {\n      ...data,\n      isDuplicate, existingInvoiceId, idempotencyKey,\n      insuranceExpired, insuranceErrors,\n      documentationComplete, missingDocuments,\n      daysOutstanding, slaBreached, billingEscalation,\n      auditLog\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "billing-check-eligibility",
+      "name": "🟠 Billing: Check Eligibility",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        2285
+      ],
+      "notes": "Insurance and expiry",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "billing-duplicate-check",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "billing-if-duplicate",
+      "name": "🟠 Billing: Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        2285
+      ],
+      "notes": "Duplicate claim check",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟠 BILLING AGENT — Duplicate Invoice Blocked\n// ============================================================\n// Returns structured response when a duplicate invoice is\n// detected via idempotency key matching.\n// ============================================================\n\nconst data = $input.first().json;\n\nreturn [{\n  json: {\n    status: data.insuranceExpired ? 'rejected' : (data.slaBreached ? 'overdue' : 'duplicate_blocked'),\n    message: data.insuranceExpired\n      ? `Claim rejected: ${data.insuranceErrors.join(' ')} (Duplicate of ${data.existingInvoiceId})`\n      : (data.slaBreached\n        ? `Claim overdue: ${data.daysOutstanding} days outstanding. SLA breach. (Duplicate of ${data.existingInvoiceId})`\n        : `Duplicate invoice detected. Invoice already exists (${data.existingInvoiceId}). Blocked.`),\n    idempotencyKey: data.idempotencyKey,\n    existingInvoiceId: data.existingInvoiceId,\n    insuranceExpired: data.insuranceExpired,\n    slaTracking: { invoiceDate: data.invoiceDate, daysOutstanding: data.daysOutstanding, slaBreached: data.slaBreached },\n    faqResponse: data.faqResponse,\n    auditLog: data.auditLog\n  }\n}];"
+      },
+      "id": "billing-duplicate-blocked",
+      "name": "🟠 Billing: Duplicate Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        2200
+      ],
+      "notes": "Blocks double billing",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟠 BILLING AGENT — Process & Submit Claim\n// ============================================================\n// Handles: Invoice creation, treatment code vs coverage\n// matching, manual override with audit trail, claim status\n// determination (submitted/rejected/held/overdue).\n// ============================================================\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  const now = data._timestamp;\n  const auditLog = [...(data.auditLog || [])];\n\n  // Register this invoice\n  const invoiceId = 'INV-' + String(Math.floor(Math.random() * 99999999)).padStart(8, '0');\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.invoiceKeys) staticData.invoiceKeys = {};\n  staticData.invoiceKeys[data.idempotencyKey] = invoiceId;\n\n  auditLog.push({\n    event: 'INVOICE_CREATED',\n    timestamp: now,\n    agent: 'billing',\n    invoiceId: invoiceId,\n    patientId: data.patientId,\n    amount: data.amount\n  });\n\n  // --- TREATMENT CODE vs COVERAGE MATCH ---\n  let mismatchDetected = false;\n  let mismatchedCodes = [];\n\n  if (data.coveredCodes.length > 0) {\n    for (const code of data.treatmentCodes) {\n      if (!data.coveredCodes.includes(code)) {\n        mismatchDetected = true;\n        mismatchedCodes.push(code);\n      }\n    }\n\n    if (mismatchDetected) {\n      auditLog.push({\n        event: 'TREATMENT_CODE_MISMATCH',\n        timestamp: now,\n        agent: 'billing',\n        mismatchedCodes: mismatchedCodes,\n        coveredCodes: data.coveredCodes\n      });\n    }\n  }\n\n  // --- MANUAL OVERRIDE ---\n  let overrideResult = null;\n  const validOverrideCodes = ['MGR-APPROVE', 'EXEC-WAIVER', 'COMPASSION-OVERRIDE', 'POLICY-EXCEPTION'];\n\n  if (data.overrideCode && data.overrideCode.trim().length > 0) {\n    if (!validOverrideCodes.includes(data.overrideCode.trim().toUpperCase())) {\n      overrideResult = {\n        applied: false,\n        error: `Invalid override code: \"${data.overrideCode}\". Valid codes: ${validOverrideCodes.join(', ')}`\n      };\n    } else if (!data.overrideJustification || data.overrideJustification.trim().length < 10) {\n      overrideResult = {\n        applied: false,\n        error: 'Override justification is required and must be at least 10 characters.'\n      };\n    } else {\n      overrideResult = {\n        applied: true,\n        code: data.overrideCode.trim().toUpperCase(),\n        justification: data.overrideJustification.trim(),\n        approvedBy: data.overrideCode.trim().toUpperCase(),\n        appliedAt: now\n      };\n      auditLog.push({\n        event: 'BILLING_OVERRIDE_APPLIED',\n        timestamp: now,\n        agent: 'billing',\n        overrideCode: overrideResult.code,\n        justification: overrideResult.justification,\n        approvedBy: overrideResult.approvedBy\n      });\n    }\n  }\n\n  // --- DETERMINE STATUS ---\n  let status = 'submitted';\n  let message = '';\n\n  if (data.insuranceExpired && !overrideResult?.applied) {\n    status = 'rejected';\n    message = `Claim rejected: ${data.insuranceErrors.join(' ')} Patient has been notified. Billing team alerted.`;\n  } else if (mismatchDetected && !overrideResult?.applied) {\n    status = 'held_for_review';\n    message = `Claim held for review: Treatment codes ${mismatchedCodes.join(', ')} are not covered under policy ${data.insurancePolicyId}. Mismatch flagged, pending billing team review.`;\n  } else if (data.slaBreached) {\n    status = 'overdue';\n    message = `Claim overdue: ${data.daysOutstanding} days outstanding. Auto-escalated to billing manager. SLA breach logged.`;\n  } else {\n    status = 'submitted';\n    message = `Invoice ${invoiceId} created successfully. Amount: MYR ${data.amount}. Treatment codes: ${data.treatmentCodes.join(', ')}. Claim submitted for processing.`;\n  }\n\n  if (!data.documentationComplete && data.missingDocuments.length > 0) {\n    message += ` Note: Missing documentation detected for treatment codes: ${data.missingDocuments.map(d => d.description).join(', ')}. Please submit supporting documents.`;\n  }\n\n  if (overrideResult?.applied) {\n    message += ` Manual override (${overrideResult.code}) applied with justification: \"${overrideResult.justification}\".`;\n  }\n\n  results.push({\n    json: {\n      status: status,\n      message: message,\n      invoiceId: invoiceId,\n      patientId: data.patientId,\n      visitId: data.visitId,\n      amount: { total: data.amount, currency: 'MYR' },\n      treatmentCodes: data.treatmentCodes,\n      insurancePolicyId: data.insurancePolicyId,\n      idempotencyKey: data.idempotencyKey,\n      insuranceExpired: data.insuranceExpired,\n      documentationCheck: {\n        complete: data.documentationComplete,\n        missingDocuments: data.missingDocuments\n      },\n      coverageMismatch: {\n        detected: mismatchDetected,\n        mismatchedCodes: mismatchedCodes,\n        coveredCodes: data.coveredCodes\n      },\n      slaTracking: {\n        invoiceDate: data.invoiceDate,\n        daysOutstanding: data.daysOutstanding,\n        slaBreached: data.slaBreached\n      },\n      billingEscalation: data.billingEscalation,\n      manualOverride: overrideResult,\n      faqResponse: data.faqResponse,\n      auditLog: auditLog\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "billing-process-claim",
+      "name": "🟠 Billing: Process Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        2380
+      ],
+      "notes": "Invoice and coverage",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟣 RETENTION AGENT — Step 1: Validate & Parse Input\n// ============================================================\n// Handles: Webhook/form data unwrap, batch vs single patient\n// detection, field normalization and parsing.\n// ============================================================\n\nlet data = $input.first().json;\n// --- UNWRAP WEBHOOK DATA ---\nif (data.body && data.webhookUrl) { data = data.body; }\n\nconst now = new Date();\nconst nowISO = now.toISOString();\n\n// Determine if batch or single patient\nlet patients = [];\nif (Array.isArray(data.patients)) {\n  patients = data.patients;\n} else {\n  patients = [{\n    patientId: data.patientId || data['Patient ID'] || '',\n    name: data.name || data['Patient Name'] || data.patientName || '',\n    lastVisitDate: data.lastVisitDate || data['Last Visit Date'] || '',\n    condition: data.condition || data['Condition/Diagnosis'] || '',\n    messagingConsent: data.messagingConsent ?? data['Messaging Consent'] ?? true,\n    unresolvedClinicalIssue: data.unresolvedClinicalIssue ?? data['Unresolved Clinical Issue'] ?? false,\n    unresolvedBillingIssue: data.unresolvedBillingIssue ?? data['Unresolved Billing Issue'] ?? false,\n    contactFrequencyCount: data.contactFrequencyCount ?? data['Contacts This Month'] ?? 0\n  }];\n}\n\nreturn [{\n  json: {\n    patients: patients,\n    totalPatients: patients.length,\n    _timestamp: nowISO,\n    _nowMs: now.getTime()\n  }\n}];"
+      },
+      "id": "retention-validate-parse",
+      "name": "🟣 Retention: Validate & Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        3335
+      ],
+      "notes": "Batch or single parse",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟣 RETENTION AGENT — Step 2: Inactivity Scan & Segmentation\n// ============================================================\n// Handles: Months inactive calculation, auto-segmentation\n// (chronic/wellness/post_procedure/lapsed/at-risk),\n// suppression checks, consent & frequency cap verification.\n// ============================================================\n\nconst data = $input.first().json;\nconst now = new Date(data._nowMs);\nconst nowISO = data._timestamp;\n\n// --- AUTO-SEGMENTATION FUNCTION ---\nfunction classifySegment(patient, monthsInactive) {\n  const condition = (patient.condition || '').toLowerCase();\n\n  const chronicKeywords = ['diabetes', 'hypertension', 'heart', 'cardiac', 'kidney', 'copd', 'cancer', 'chronic', 'asthma', 'epilepsy', 'arthritis'];\n  const postProcKeywords = ['surgery', 'post-op', 'procedure', 'recovery', 'transplant', 'operation'];\n  const wellnessKeywords = ['wellness', 'preventive', 'checkup', 'screening', 'annual', 'routine', 'check-up'];\n\n  let baseSegment = 'unclassified';\n  let reason = 'No matching condition keywords found';\n\n  if (chronicKeywords.some(kw => condition.includes(kw))) {\n    baseSegment = 'chronic';\n    reason = `Chronic condition keyword detected: \"${condition}\"`;\n  } else if (postProcKeywords.some(kw => condition.includes(kw))) {\n    baseSegment = 'post_procedure';\n    reason = `Post-procedure keyword detected: \"${condition}\"`;\n  } else if (wellnessKeywords.some(kw => condition.includes(kw))) {\n    baseSegment = 'wellness';\n    reason = `Wellness keyword detected: \"${condition}\"`;\n  }\n\n  let finalSegment = baseSegment;\n  if (monthsInactive >= 12 && baseSegment !== 'chronic') {\n    finalSegment = 'lapsed';\n    reason += ` | Override: ${monthsInactive} months inactive (non-chronic) \\u2192 lapsed`;\n  } else if (monthsInactive >= 6 && baseSegment === 'chronic') {\n    finalSegment = 'at-risk';\n    reason += ` | Override: ${monthsInactive} months inactive (chronic) \\u2192 at-risk`;\n  }\n\n  return { segment: finalSegment, reason: reason, autoClassified: true };\n}\n\n// --- PROCESS EACH PATIENT ---\nconst processedPatients = [];\nlet hasEligiblePatients = false;\n\nfor (const patient of data.patients) {\n  const patientId = patient.patientId || '';\n  const name = patient.name || patient.fullName || 'Patient';\n\n  // Parse booleans from form dropdowns\n  const messagingConsent = patient.messagingConsent === true || patient.messagingConsent === 'true';\n  const unresolvedClinical = patient.unresolvedClinicalIssue === true || patient.unresolvedClinicalIssue === 'true';\n  const unresolvedBilling = patient.unresolvedBillingIssue === true || patient.unresolvedBillingIssue === 'true';\n  let contactCount = parseInt(patient.contactFrequencyCount, 10) || 0;\n\n  // Calculate months inactive\n  let monthsInactive = 0;\n  let isInactive = false;\n  if (patient.lastVisitDate) {\n    const lastVisit = new Date(patient.lastVisitDate);\n    monthsInactive = Math.floor((now - lastVisit) / (1000 * 60 * 60 * 24 * 30.44));\n    isInactive = monthsInactive >= 6;\n  }\n\n  // Auto-segment\n  const segmentation = classifySegment(patient, monthsInactive);\n\n  // --- SUPPRESSION CHECKS ---\n  let suppressed = false;\n  let suppressionReason = '';\n\n  if (unresolvedClinical) {\n    suppressed = true;\n    suppressionReason = 'Patient has unresolved clinical issue. Outreach suppressed until resolved.';\n  }\n\n  if (unresolvedBilling && !suppressed) {\n    suppressed = true;\n    suppressionReason = 'Patient has unresolved billing issue. Marketing outreach suppressed.';\n  }\n\n  if (!messagingConsent && !suppressed) {\n    suppressed = true;\n    suppressionReason = 'Patient has not provided messaging consent. No outreach permitted.';\n  }\n\n  if (contactCount >= 2 && !suppressed) {\n    suppressed = true;\n    suppressionReason = `Frequency cap exceeded: ${contactCount} contacts this month (max 2). Next outreach scheduled for next cycle.`;\n  }\n\n  if (!isInactive && !suppressed) {\n    suppressed = true;\n    suppressionReason = `Patient is not inactive (last visit ${monthsInactive} months ago, threshold: 6 months).`;\n  }\n\n  if (!suppressed) hasEligiblePatients = true;\n\n  processedPatients.push({\n    patientId, name, monthsInactive, isInactive,\n    segmentClassification: segmentation,\n    messagingConsent,\n    suppressionFlags: {\n      unresolvedClinicalIssue: unresolvedClinical,\n      unresolvedBillingIssue: unresolvedBilling,\n      contactFrequencyCount: contactCount,\n      frequencyCapExceeded: contactCount >= 2\n    },\n    suppressed, suppressionReason,\n    condition: patient.condition || ''\n  });\n}\n\nreturn [{\n  json: {\n    patients: processedPatients,\n    totalPatients: processedPatients.length,\n    hasEligiblePatients: hasEligiblePatients,\n    _timestamp: nowISO\n  }\n}];"
+      },
+      "id": "retention-scan-classify",
+      "name": "🟣 Retention: Scan & Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        3335
+      ],
+      "notes": "5 patient segments",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retention-eligible-check",
+              "leftValue": "={{ $json.hasEligiblePatients }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "retention-if-eligible",
+      "name": "🟣 Retention: Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        3335
+      ],
+      "notes": "Eligible or suppressed",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟣 RETENTION AGENT — Generate Outreach Messages\n// ============================================================\n// Handles: Segment-specific messaging templates, outreach\n// channel assignment, audit logging for eligible patients.\n// ============================================================\n\nconst data = $input.first().json;\nconst nowISO = data._timestamp;\n\nconst segmentMessages = {\n  'chronic': 'Dear {name}, it\\'s been a while since your last visit. As a patient managing a chronic condition, regular check-ups are important for your health. Please book your next appointment at your earliest convenience.',\n  'at-risk': 'Dear {name}, we notice you haven\\'t visited in over 6 months. Managing chronic conditions requires regular monitoring. Please contact us to schedule a follow-up \\u2014 your health is our priority.',\n  'wellness': 'Dear {name}, it\\'s time for your routine wellness check-up! Regular preventive care helps catch issues early. Book your next appointment today.',\n  'post_procedure': 'Dear {name}, as a post-procedure patient, follow-up visits are essential for your recovery. Please book your next check-up to ensure everything is healing well.',\n  'lapsed': 'Dear {name}, we miss you at our clinic! It\\'s been over a year since your last visit. We\\'d love to help you stay on top of your health. Book an appointment today.',\n  'unclassified': 'Dear {name}, it\\'s been a while since we last saw you. We\\'re here for all your healthcare needs. Book your next appointment at your convenience.'\n};\n\nconst results = [];\nconst auditLog = [];\n\nfor (const patient of data.patients) {\n  let outreach = null;\n  let action = 'suppressed';\n\n  if (!patient.suppressed) {\n    const messageTemplate = segmentMessages[patient.segmentClassification.segment] || segmentMessages['unclassified'];\n    const message = messageTemplate.replace('{name}', patient.name);\n\n    outreach = {\n      channel: 'sms',\n      message: message,\n      segment: patient.segmentClassification.segment,\n      sentAt: nowISO\n    };\n    action = 'outreach_sent';\n\n    auditLog.push({\n      event: 'RETENTION_OUTREACH_SENT',\n      timestamp: nowISO,\n      agent: 'retention',\n      patientId: patient.patientId,\n      segment: patient.segmentClassification.segment,\n      channel: 'sms'\n    });\n  } else {\n    auditLog.push({\n      event: 'RETENTION_SUPPRESSED',\n      timestamp: nowISO,\n      agent: 'retention',\n      patientId: patient.patientId,\n      reason: patient.suppressionReason\n    });\n  }\n\n  results.push({\n    patientId: patient.patientId,\n    name: patient.name,\n    monthsInactive: patient.monthsInactive,\n    isInactive: patient.isInactive,\n    segmentClassification: patient.segmentClassification,\n    messagingConsent: patient.messagingConsent,\n    suppressionFlags: patient.suppressionFlags,\n    action: action,\n    suppressed: patient.suppressed,\n    suppressionReason: patient.suppressed ? patient.suppressionReason : null,\n    outreach: outreach\n  });\n}\n\nreturn [{\n  json: {\n    status: 'processed',\n    totalPatients: results.length,\n    outreachSent: results.filter(r => r.action === 'outreach_sent').length,\n    suppressed: results.filter(r => r.suppressed).length,\n    patients: results,\n    auditLog: auditLog\n  }\n}];"
+      },
+      "id": "retention-generate-outreach",
+      "name": "🟣 Retention: Generate Outreach",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        3250
+      ],
+      "notes": "6 message templates",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// 🟣 RETENTION AGENT — All Patients Suppressed\n// ============================================================\n// Returns response when no patients are eligible for outreach.\n// All patients are either active, on suppression list,\n// lacking consent, or frequency-capped.\n// ============================================================\n\nconst data = $input.first().json;\nconst nowISO = data._timestamp;\n\nconst results = [];\nconst auditLog = [];\n\nfor (const patient of data.patients) {\n  auditLog.push({\n    event: 'RETENTION_SUPPRESSED',\n    timestamp: nowISO,\n    agent: 'retention',\n    patientId: patient.patientId,\n    reason: patient.suppressionReason\n  });\n\n  results.push({\n    patientId: patient.patientId,\n    name: patient.name,\n    monthsInactive: patient.monthsInactive,\n    isInactive: patient.isInactive,\n    segmentClassification: patient.segmentClassification,\n    messagingConsent: patient.messagingConsent,\n    suppressionFlags: patient.suppressionFlags,\n    action: 'suppressed',\n    suppressed: true,\n    suppressionReason: patient.suppressionReason,\n    outreach: null\n  });\n}\n\nreturn [{\n  json: {\n    status: 'processed',\n    totalPatients: results.length,\n    outreachSent: 0,\n    suppressed: results.length,\n    patients: results,\n    auditLog: auditLog\n  }\n}];"
+      },
+      "id": "retention-all-suppressed",
+      "name": "🟣 Retention: All Suppressed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        3430
+      ],
+      "notes": "Suppression audit log",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "🌐 Pre-Visit: Webhook": {
+      "main": [
+        [
+          {
+            "node": "🔵 Pre-Visit: Validate & Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔵 Pre-Visit: Validate & Score": {
+      "main": [
+        [
+          {
+            "node": "🔵 Pre-Visit: Escalation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔵 Pre-Visit: Escalation?": {
+      "main": [
+        [
+          {
+            "node": "🔵 Pre-Visit: Create Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔵 Pre-Visit: Normal Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🌐 Post-Visit: Webhook": {
+      "main": [
+        [
+          {
+            "node": "🟢 Post-Visit: Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟢 Post-Visit: Validate Input": {
+      "main": [
+        [
+          {
+            "node": "🟢 Post-Visit: Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟢 Post-Visit: Valid?": {
+      "main": [
+        [
+          {
+            "node": "🟢 Post-Visit: Red-Flag NLP (Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🟢 Post-Visit: Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟢 Post-Visit: Red-Flag NLP (Groq)": {
+      "main": [
+        [
+          {
+            "node": "🟢 Post-Visit: Process & Decide",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🟢 Post-Visit: LLM Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🌐 Billing: Webhook": {
+      "main": [
+        [
+          {
+            "node": "🟠 Billing: Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🌐 Retention: Webhook": {
+      "main": [
+        [
+          {
+            "node": "🟣 Retention: Validate & Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🌐 Triage: Webhook": {
+      "main": [
+        [
+          {
+            "node": "🔴 Triage: Emergency Scanner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔴 Triage: Emergency Scanner": {
+      "main": [
+        [
+          {
+            "node": "🔴 Triage: Emergency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔴 Triage: Emergency?": {
+      "main": [
+        [
+          {
+            "node": "🔴 Triage: Emergency Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔴 Triage: LLM Classifier (Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔴 Triage: LLM Classifier (Groq)": {
+      "main": [
+        [
+          {
+            "node": "🔴 Triage: Process & Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔴 Triage: LLM Error Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Pre-Visit: Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "🔵 Pre-Visit: Validate & Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Post-Visit: Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "🟢 Post-Visit: Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Billing: Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "🟠 Billing: Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Retention: Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "🟣 Retention: Validate & Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Triage: Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "🔴 Triage: Emergency Scanner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟠 Billing: Validate Input": {
+      "main": [
+        [
+          {
+            "node": "🟠 Billing: Check Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟠 Billing: Check Eligibility": {
+      "main": [
+        [
+          {
+            "node": "🟠 Billing: Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟠 Billing: Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "🟠 Billing: Duplicate Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🟠 Billing: Process Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟣 Retention: Validate & Parse": {
+      "main": [
+        [
+          {
+            "node": "🟣 Retention: Scan & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟣 Retention: Scan & Classify": {
+      "main": [
+        [
+          {
+            "node": "🟣 Retention: Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🟣 Retention: Eligible?": {
+      "main": [
+        [
+          {
+            "node": "🟣 Retention: Generate Outreach",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🟣 Retention: All Suppressed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": {
+    "global": {
+      "escalationKeys": {},
+      "invoiceKeys": {}
+    }
+  },
+  "tags": [
+    {
+      "name": "healthcare"
+    },
+    {
+      "name": "patient-lifecycle"
+    },
+    {
+      "name": "production"
+    }
+  ],
+  "triggerCount": 10,
+  "updatedAt": "2026-03-16T00:00:00.000Z",
+  "versionId": "2.0.0",
+  "id": "Rsm4IKWGMaz0uKNV",
+  "meta": {
+    "instanceId": "local",
+    "templateCredsSetupCompleted": true
+  }
+}

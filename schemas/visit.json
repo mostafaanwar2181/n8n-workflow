@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Visit",
+  "description": "Records each clinical appointment at any branch. Links patient to treatment codes, doctor, and branch.",
+  "type": "object",
+  "required": [
+    "visitId",
+    "patientId",
+    "visitDate",
+    "branchId",
+    "doctorId",
+    "status",
+    "createdAt"
+  ],
+  "properties": {
+    "visitId": {
+      "type": "string",
+      "pattern": "^VIS-[0-9]{8}$",
+      "description": "Unique visit identifier. Format: VIS-XXXXXXXX."
+    },
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Reference to the Patient record."
+    },
+    "visitDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Scheduled date and time of the appointment."
+    },
+    "branchId": {
+      "type": "string",
+      "description": "Identifier of the clinic branch where the visit occurs."
+    },
+    "doctorId": {
+      "type": "string",
+      "description": "Identifier of the assigned doctor/physician."
+    },
+    "treatmentCodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{1,5}[0-9]{2,5}$"
+      },
+      "description": "List of treatment/procedure codes applied during the visit (e.g., CPT or ICD codes)."
+    },
+    "chiefComplaint": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Patient's primary reason for visit as described at intake."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["scheduled", "checked-in", "in-progress", "completed", "cancelled", "no-show"],
+      "description": "Current status of the visit."
+    },
+    "visitType": {
+      "type": "string",
+      "enum": ["initial", "follow-up", "routine-checkup", "emergency", "specialist-referral"],
+      "description": "Classification of the visit type."
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "Doctor's clinical notes for this visit."
+    },
+    "prescriptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["medicationName", "dosage", "frequency"],
+        "properties": {
+          "medicationName": { "type": "string" },
+          "dosage": { "type": "string" },
+          "frequency": { "type": "string" },
+          "duration": { "type": "string" },
+          "refillsRemaining": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "Prescriptions issued during the visit."
+    },
+    "postVisitFollowUpRequired": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether a post-visit check-in should be triggered. Drives Post-Visit agent."
+    },
+    "followUpDate": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Scheduled date for next follow-up if applicable."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when visit record was created."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when visit record was last modified."
+    }
+  },
+  "additionalProperties": false
+}

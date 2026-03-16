@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Patient Lifecycle AI System</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; }
+  
+  /* Header */
+  .header { background: #1e293b; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+  .header h1 { font-size: 1.2rem; color: #f1f5f9; }
+  .header .meta { font-size: 0.8rem; color: #94a3b8; }
+  .header .status-badge { background: #059669; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  
+  /* Top Stats Bar */
+  .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding: 20px 28px; }
+  .stat-card { background: #1e293b; border-radius: 10px; padding: 16px; text-align: center; border: 1px solid #334155; }
+  .stat-card .number { font-size: 2rem; font-weight: 700; }
+  .stat-card .label { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+  .stat-card.red .number { color: #f87171; }
+  .stat-card.yellow .number { color: #fbbf24; }
+  .stat-card.green .number { color: #34d399; }
+  .stat-card.blue .number { color: #60a5fa; }
+  .stat-card.purple .number { color: #a78bfa; }
+  .stat-card.orange .number { color: #fb923c; }
+  
+  /* Main Grid */
+  .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 28px 28px; }
+  @media (max-width: 1024px) { .dashboard { grid-template-columns: 1fr; } .stats-bar { grid-template-columns: repeat(3, 1fr); } }
+  
+  /* Panel */
+  .panel { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+  .panel h2 { font-size: 1rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .panel .annotation { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 12px; font-size: 0.72rem; color: #94a3b8; margin-bottom: 14px; line-height: 1.4; }
+  
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; padding: 8px 10px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #334155; font-size: 0.75rem; text-transform: uppercase; }
+  td { padding: 8px 10px; border-bottom: 1px solid rgba(51,65,85,0.5); }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+  .badge.critical { background: #7f1d1d; color: #fca5a5; }
+  .badge.high { background: #92400e; color: #fcd34d; }
+  .badge.medium { background: #1e3a5f; color: #93c5fd; }
+  .badge.low { background: #064e3b; color: #6ee7b7; }
+  .badge.open { background: #7f1d1d; color: #fca5a5; }
+  .badge.resolved { background: #064e3b; color: #6ee7b7; }
+  .badge.in-progress { background: #92400e; color: #fcd34d; }
+  .badge.emergency { background: #7f1d1d; color: #fca5a5; }
+  .badge.clinical { background: #581c87; color: #d8b4fe; }
+  .badge.billing { background: #92400e; color: #fcd34d; }
+  
+  /* Bar charts */
+  .bar-chart { margin-top: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bar-label { width: 130px; font-size: 0.78rem; color: #cbd5e1; text-align: right; }
+  .bar-track { flex: 1; background: #334155; border-radius: 4px; height: 22px; position: relative; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 0.7rem; font-weight: 600; color: #fff; min-width: 28px; }
+  .bar-fill.red { background: #ef4444; }
+  .bar-fill.yellow { background: #eab308; }
+  .bar-fill.green { background: #22c55e; }
+  .bar-fill.blue { background: #3b82f6; }
+  .bar-fill.purple { background: #8b5cf6; }
+  .bar-fill.orange { background: #f97316; }
+  
+  /* Metric card inside panel */
+  .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(51,65,85,0.4); }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { font-size: 0.82rem; color: #cbd5e1; }
+  .metric-value { font-size: 1rem; font-weight: 700; }
+  
+  /* Retention funnel */
+  .funnel { margin-top: 12px; }
+  .funnel-step { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .funnel-bar { height: 28px; border-radius: 4px; display: flex; align-items: center; padding: 0 12px; font-size: 0.78rem; font-weight: 600; color: #fff; }
+  .funnel-label { width: 160px; font-size: 0.78rem; color: #cbd5e1; text-align: right; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <h1>🏥 Agentic Patient Lifecycle AI — Admin Dashboard</h1>
+    <span class="meta">Multi-Branch Clinic Group | Real-Time Operational Monitoring</span>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <span class="meta">Last updated: 2026-03-16 09:45 MYT</span>
+    <span class="status-badge">● SYSTEM ACTIVE</span>
+  </div>
+</div>
+
+<!-- Top Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-card red">
+    <div class="number">12</div>
+    <div class="label">Active Red Flags</div>
+  </div>
+  <div class="stat-card yellow">
+    <div class="number">8</div>
+    <div class="label">Unresolved Claims</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="number">5</div>
+    <div class="label">High-Risk Patients</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="number">3</div>
+    <div class="label">SLA Breaches</div>
+  </div>
+  <div class="stat-card green">
+    <div class="number">26.2%</div>
+    <div class="label">Retention Conversion</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="number">31</div>
+    <div class="label">Total Escalations (7d)</div>
+  </div>
+</div>
+
+<div class="dashboard">
+
+  <!-- Panel 1: Red Flag Cases -->
+  <div class="panel">
+    <h2>🚨 Red Flag Cases</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Post-Visit Agent (NLP red-flag classifier) and Clinical Triage Agent (emergency keyword scanner).<br>
+      <strong>Metric:</strong> Volume of red-flag detections by category, with severity and resolution status. Critical items require immediate attention.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Patient</th><th>Category</th><th>Severity</th><th>Source</th><th>Status</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>PAT-00000003</td><td>Shortness of Breath</td><td><span class="badge critical">Critical</span></td><td>Post-Visit</td><td><span class="badge open">Open</span></td><td>2m ago</td></tr>
+        <tr><td>PAT-00000018</td><td>Emergency — Heart Attack</td><td><span class="badge critical">Critical</span></td><td>Triage</td><td><span class="badge in-progress">In Progress</span></td><td>8m ago</td></tr>
+        <tr><td>PAT-00000004</td><td>High Fever (39.5°C)</td><td><span class="badge high">High</span></td><td>Post-Visit</td><td><span class="badge open">Open</span></td><td>15m ago</td></tr>
+        <tr><td>PAT-00000005</td><td>Medication Side Effect</td><td><span class="badge high">High</span></td><td>Post-Visit</td><td><span class="badge in-progress">In Progress</span></td><td>22m ago</td></tr>
+        <tr><td>PAT-00000002</td><td>Pain Score Conflict</td><td><span class="badge high">High</span></td><td>Post-Visit</td><td><span class="badge resolved">Resolved</span></td><td>1h ago</td></tr>
+        <tr><td>PAT-00000024</td><td>Post-Op Bleeding</td><td><span class="badge high">High</span></td><td>Post-Visit</td><td><span class="badge open">Open</span></td><td>30m ago</td></tr>
+      </tbody>
+    </table>
+    <div class="bar-chart" style="margin-top:16px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">Red Flag Volume by Category (Last 30 Days)</div>
+      <div class="bar-row"><div class="bar-label">Worsening Pain</div><div class="bar-track"><div class="bar-fill red" style="width:45%">18</div></div></div>
+      <div class="bar-row"><div class="bar-label">Bleeding</div><div class="bar-track"><div class="bar-fill red" style="width:30%">12</div></div></div>
+      <div class="bar-row"><div class="bar-label">Shortness of Breath</div><div class="bar-track"><div class="bar-fill red" style="width:20%">8</div></div></div>
+      <div class="bar-row"><div class="bar-label">High Fever</div><div class="bar-track"><div class="bar-fill orange" style="width:25%">10</div></div></div>
+      <div class="bar-row"><div class="bar-label">Med Side Effects</div><div class="bar-track"><div class="bar-fill yellow" style="width:15%">6</div></div></div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Unresolved Billing Claims -->
+  <div class="panel">
+    <h2>💰 Unresolved Billing Claims</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Billing & Insurance Agent — SLA tracking, duplicate detection, and coverage validation.<br>
+      <strong>Metric:</strong> Outstanding claims by age bucket, total value, escalation status. Claims >30 days trigger auto-escalation.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:#0f172a;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#34d399;">3</div>
+        <div style="font-size:0.7rem;color:#94a3b8;">0-15 Days</div>
+        <div style="font-size:0.75rem;color:#cbd5e1;">MYR 2,150</div>
+      </div>
+      <div style="background:#0f172a;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#fbbf24;">3</div>
+        <div style="font-size:0.7rem;color:#94a3b8;">15-30 Days</div>
+        <div style="font-size:0.75rem;color:#cbd5e1;">MYR 4,800</div>
+      </div>
+      <div style="background:#0f172a;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:700;color:#f87171;">2</div>
+        <div style="font-size:0.7rem;color:#94a3b8;">30+ Days ⚠️</div>
+        <div style="font-size:0.75rem;color:#cbd5e1;">MYR 3,200</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Invoice</th><th>Patient</th><th>Amount</th><th>Days</th><th>Issue</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>INV-00000014</td><td>PAT-00000014</td><td>MYR 180</td><td>35</td><td>SLA Breach</td><td><span class="badge critical">Escalated</span></td></tr>
+        <tr><td>INV-00000012</td><td>PAT-00000012</td><td>MYR 500</td><td>28</td><td>Expired Policy</td><td><span class="badge high">Rejected</span></td></tr>
+        <tr><td>INV-00000013</td><td>PAT-00000013</td><td>MYR 1,200</td><td>22</td><td>Code Mismatch</td><td><span class="badge high">Held</span></td></tr>
+        <tr><td>INV-00000031</td><td>PAT-00000031</td><td>MYR 750</td><td>18</td><td>Missing Docs</td><td><span class="badge medium">Pending</span></td></tr>
+        <tr><td>INV-00000033</td><td>PAT-00000033</td><td>MYR 320</td><td>8</td><td>—</td><td><span class="badge low">Processing</span></td></tr>
+      </tbody>
+    </table>
+    <div class="metric-row" style="margin-top:12px;">
+      <span class="metric-label">Total Unresolved Value</span>
+      <span class="metric-value" style="color:#fbbf24;">MYR 10,150</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Duplicate Invoices Blocked (30d)</span>
+      <span class="metric-value" style="color:#34d399;">7</span>
+    </div>
+  </div>
+
+  <!-- Panel 3: High-Risk Patients -->
+  <div class="panel">
+    <h2>⚠️ High-Risk Patients</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Pre-Visit Agent (risk score calculator) and Post-Visit Agent (active clinical alerts).<br>
+      <strong>Metric:</strong> Patients with risk score ≥7 or active clinical alerts requiring monitoring.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Patient</th><th>Risk Score</th><th>Level</th><th>Conditions</th><th>Active Alerts</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>PAT-00000004 (Raj Kumar)</td><td>9</td><td><span class="badge critical">Critical</span></td><td>Hypertension, Chest Pain, Diabetes</td><td>2</td><td><span class="badge open">Monitoring</span></td></tr>
+        <tr><td>PAT-00000028 (Tan Mei Ling)</td><td>8</td><td><span class="badge high">High</span></td><td>Heart Disease, Stroke History</td><td>1</td><td><span class="badge in-progress">Under Care</span></td></tr>
+        <tr><td>PAT-00000031 (Hassan Ali)</td><td>7</td><td><span class="badge high">High</span></td><td>Hypertension, Chest Pain</td><td>1</td><td><span class="badge open">Escalated</span></td></tr>
+        <tr><td>PAT-00000003</td><td>—</td><td><span class="badge critical">Critical</span></td><td>Post-Op: SOB detected</td><td>1</td><td><span class="badge open">Emergency</span></td></tr>
+        <tr><td>PAT-00000005</td><td>—</td><td><span class="badge high">High</span></td><td>Med Side Effect: Rash+Dizziness</td><td>1</td><td><span class="badge in-progress">Under Review</span></td></tr>
+      </tbody>
+    </table>
+    <div class="bar-chart" style="margin-top:14px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">Risk Score Distribution (Active Patients)</div>
+      <div class="bar-row"><div class="bar-label">Low (0-3)</div><div class="bar-track"><div class="bar-fill green" style="width:65%">142</div></div></div>
+      <div class="bar-row"><div class="bar-label">Medium (4-6)</div><div class="bar-track"><div class="bar-fill blue" style="width:20%">38</div></div></div>
+      <div class="bar-row"><div class="bar-label">High (7-10)</div><div class="bar-track"><div class="bar-fill orange" style="width:10%">18</div></div></div>
+      <div class="bar-row"><div class="bar-label">Critical (11+)</div><div class="bar-track"><div class="bar-fill red" style="width:4%">5</div></div></div>
+    </div>
+  </div>
+
+  <!-- Panel 4: SLA Breaches -->
+  <div class="panel">
+    <h2>⏱️ SLA Breaches</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Escalation Engine — all 5 agents contribute SLA data.<br>
+      <strong>Metric:</strong> Breached SLAs by agent type, time overdue, breach count. SLA tiers: Emergency 5min, Clinical 1hr, Billing 24hr, Standard 48hr.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Ticket</th><th>Agent</th><th>SLA Type</th><th>Deadline</th><th>Overdue By</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ESC-00000041</td><td>Post-Visit</td><td>Clinical (1hr)</td><td>08:30 MYT</td><td>1h 15m</td><td><span class="badge high">High</span></td></tr>
+        <tr><td>ESC-00000036</td><td>Billing</td><td>Billing (24hr)</td><td>Yesterday</td><td>4h 20m</td><td><span class="badge high">High</span></td></tr>
+        <tr><td>ESC-00000029</td><td>Pre-Visit</td><td>Standard (48hr)</td><td>Mar 14</td><td>2d 3h</td><td><span class="badge medium">Medium</span></td></tr>
+      </tbody>
+    </table>
+    <div class="bar-chart" style="margin-top:16px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">SLA Breaches by Agent (Last 30 Days)</div>
+      <div class="bar-row"><div class="bar-label">Pre-Visit</div><div class="bar-track"><div class="bar-fill blue" style="width:15%">3</div></div></div>
+      <div class="bar-row"><div class="bar-label">Post-Visit</div><div class="bar-track"><div class="bar-fill green" style="width:30%">6</div></div></div>
+      <div class="bar-row"><div class="bar-label">Billing</div><div class="bar-track"><div class="bar-fill orange" style="width:40%">8</div></div></div>
+      <div class="bar-row"><div class="bar-label">Retention</div><div class="bar-track"><div class="bar-fill purple" style="width:5%">1</div></div></div>
+      <div class="bar-row"><div class="bar-label">Triage</div><div class="bar-track"><div class="bar-fill red" style="width:10%">2</div></div></div>
+    </div>
+    <div class="metric-row" style="margin-top:12px;">
+      <span class="metric-label">Total SLA Breaches (30d)</span>
+      <span class="metric-value" style="color:#f87171;">20</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">SLA Compliance Rate</span>
+      <span class="metric-value" style="color:#34d399;">93.5%</span>
+    </div>
+  </div>
+
+  <!-- Panel 5: Retention Conversion Rate -->
+  <div class="panel">
+    <h2>📈 Retention Conversion Rate</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Retention Agent — outreach tracking, re-appointment bookings, suppression/cap enforcement.<br>
+      <strong>Metric:</strong> Outreach sent vs. re-appointments booked. Segmented by patient type. Includes suppression and frequency cap stats.
+    </div>
+    <div class="funnel">
+      <div class="funnel-step"><div class="funnel-label">Inactive Identified</div><div class="funnel-bar" style="width:100%;background:#3b82f6;">248</div></div>
+      <div class="funnel-step"><div class="funnel-label">Passed Suppression</div><div class="funnel-bar" style="width:78%;background:#8b5cf6;">193</div></div>
+      <div class="funnel-step"><div class="funnel-label">Consent Verified</div><div class="funnel-bar" style="width:70%;background:#a855f7;">174</div></div>
+      <div class="funnel-step"><div class="funnel-label">Within Freq Cap</div><div class="funnel-bar" style="width:65%;background:#6366f1;">161</div></div>
+      <div class="funnel-step"><div class="funnel-label">Outreach Sent</div><div class="funnel-bar" style="width:60%;background:#22c55e;">149</div></div>
+      <div class="funnel-step"><div class="funnel-label">Re-Appointments</div><div class="funnel-bar" style="width:16%;background:#059669;">39</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+      <div class="metric-row"><span class="metric-label">Conversion Rate</span><span class="metric-value" style="color:#34d399;">26.2%</span></div>
+      <div class="metric-row"><span class="metric-label">Suppressed (Clinical)</span><span class="metric-value" style="color:#f87171;">31</span></div>
+      <div class="metric-row"><span class="metric-label">No Consent</span><span class="metric-value" style="color:#fbbf24;">19</span></div>
+      <div class="metric-row"><span class="metric-label">Freq Cap Blocked</span><span class="metric-value" style="color:#60a5fa;">12</span></div>
+    </div>
+    <div style="margin-top:14px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">Conversion by Segment</div>
+      <div class="bar-row"><div class="bar-label">Chronic / At-Risk</div><div class="bar-track"><div class="bar-fill green" style="width:38%">38%</div></div></div>
+      <div class="bar-row"><div class="bar-label">Wellness</div><div class="bar-track"><div class="bar-fill blue" style="width:28%">28%</div></div></div>
+      <div class="bar-row"><div class="bar-label">Post-Procedure</div><div class="bar-track"><div class="bar-fill purple" style="width:22%">22%</div></div></div>
+      <div class="bar-row"><div class="bar-label">Lapsed</div><div class="bar-track"><div class="bar-fill orange" style="width:12%">12%</div></div></div>
+    </div>
+  </div>
+
+  <!-- Panel 6: Escalation Volume -->
+  <div class="panel">
+    <h2>🔔 Escalation Volume</h2>
+    <div class="annotation">
+      <strong>Source:</strong> Escalation Engine — collects escalation data from all 5 agents.<br>
+      <strong>Metric:</strong> Total escalation volume broken down by source agent and escalation destination type. Tracks duplicates blocked.
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">Escalations by Agent (Last 7 Days)</div>
+      <div class="bar-row"><div class="bar-label">Pre-Visit</div><div class="bar-track"><div class="bar-fill blue" style="width:20%">6</div></div></div>
+      <div class="bar-row"><div class="bar-label">Post-Visit</div><div class="bar-track"><div class="bar-fill green" style="width:35%">11</div></div></div>
+      <div class="bar-row"><div class="bar-label">Billing</div><div class="bar-track"><div class="bar-fill orange" style="width:25%">8</div></div></div>
+      <div class="bar-row"><div class="bar-label">Retention</div><div class="bar-track"><div class="bar-fill purple" style="width:5%">1</div></div></div>
+      <div class="bar-row"><div class="bar-label">Triage</div><div class="bar-track"><div class="bar-fill red" style="width:15%">5</div></div></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:8px;">Escalations by Destination</div>
+      <div class="bar-row"><div class="bar-label">Emergency Services</div><div class="bar-track"><div class="bar-fill red" style="width:15%">5</div></div></div>
+      <div class="bar-row"><div class="bar-label">Nurse Queue</div><div class="bar-track"><div class="bar-fill blue" style="width:20%">6</div></div></div>
+      <div class="bar-row"><div class="bar-label">Physician/Doctor</div><div class="bar-track"><div class="bar-fill green" style="width:30%">9</div></div></div>
+      <div class="bar-row"><div class="bar-label">Billing Manager</div><div class="bar-track"><div class="bar-fill orange" style="width:25%">8</div></div></div>
+      <div class="bar-row"><div class="bar-label">Clinical Team</div><div class="bar-track"><div class="bar-fill purple" style="width:10%">3</div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="metric-row"><span class="metric-label">Total Escalations (7d)</span><span class="metric-value" style="color:#60a5fa;">31</span></div>
+      <div class="metric-row"><span class="metric-label">Duplicates Blocked</span><span class="metric-value" style="color:#34d399;">4</span></div>
+      <div class="metric-row"><span class="metric-label">Avg Resolution Time</span><span class="metric-value" style="color:#fbbf24;">2.4h</span></div>
+      <div class="metric-row"><span class="metric-label">Open Tickets</span><span class="metric-value" style="color:#f87171;">9</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:20px;font-size:0.72rem;color:#475569;">
+  Agentic Patient Lifecycle AI System — Admin Dashboard v2.0 | Solver AI Sdn Bhd Technical Assessment<br>
+  Data shown is sample/demo data. Production connects to real-time APIs.
+</div>
+
+</body>
+</html>

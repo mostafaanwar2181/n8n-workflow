@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic Patient Lifecycle AI — System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { text-align: center; font-size: 1.6rem; margin-bottom: 6px; color: #f1f5f9; }
+  .subtitle { text-align: center; font-size: 0.9rem; color: #94a3b8; margin-bottom: 28px; }
+  .diagram { max-width: 1100px; margin: 0 auto; }
+  .layer { border: 2px solid; border-radius: 12px; padding: 18px 22px; margin-bottom: 14px; position: relative; }
+  .layer-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .layer-num { font-size: 0.7rem; background: rgba(255,255,255,0.1); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .layer-title { font-size: 1.05rem; font-weight: 700; }
+  .layer-desc { font-size: 0.82rem; color: #cbd5e1; line-height: 1.45; }
+  .components { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .comp { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; }
+  .arrow-container { text-align: center; margin: -6px 0; font-size: 1.4rem; color: #64748b; }
+  /* Layer colors */
+  .chat-layer { border-color: #3b82f6; background: rgba(59,130,246,0.08); }
+  .chat-layer .layer-title { color: #60a5fa; }
+  .rules-layer { border-color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .rules-layer .layer-title { color: #fbbf24; }
+  .llm-layer { border-color: #8b5cf6; background: rgba(139,92,246,0.08); }
+  .llm-layer .layer-title { color: #a78bfa; }
+  .data-layer { border-color: #10b981; background: rgba(16,185,129,0.08); }
+  .data-layer .layer-title { color: #34d399; }
+  .esc-layer { border-color: #ef4444; background: rgba(239,68,68,0.08); }
+  .esc-layer .layer-title { color: #f87171; }
+  .audit-layer { border-color: #6366f1; background: rgba(99,102,241,0.08); }
+  .audit-layer .layer-title { color: #818cf8; }
+  .dash-layer { border-color: #ec4899; background: rgba(236,72,153,0.08); }
+  .dash-layer .layer-title { color: #f472b6; }
+  /* Agents strip */
+  .agents-strip { display: flex; gap: 10px; margin: 28px 0 18px; flex-wrap: wrap; justify-content: center; }
+  .agent-badge { padding: 10px 18px; border-radius: 10px; font-size: 0.82rem; font-weight: 600; text-align: center; min-width: 160px; }
+  .agent-previsit { background: #1e40af; border: 1px solid #3b82f6; }
+  .agent-postvisit { background: #065f46; border: 1px solid #10b981; }
+  .agent-billing { background: #92400e; border: 1px solid #f59e0b; }
+  .agent-retention { background: #581c87; border: 1px solid #a855f7; }
+  .agent-triage { background: #7f1d1d; border: 1px solid #ef4444; }
+  .flow-section { max-width: 1100px; margin: 36px auto 0; }
+  .flow-section h2 { font-size: 1.2rem; margin-bottom: 16px; color: #f1f5f9; text-align: center; }
+  .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .flow-grid { grid-template-columns: 1fr; } }
+  .flow-card { border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 16px; background: rgba(255,255,255,0.03); }
+  .flow-card h3 { font-size: 0.95rem; margin-bottom: 8px; }
+  .flow-steps { list-style: none; }
+  .flow-steps li { font-size: 0.8rem; color: #cbd5e1; padding: 3px 0; padding-left: 18px; position: relative; line-height: 1.4; }
+  .flow-steps li::before { content: '→'; position: absolute; left: 0; color: #64748b; }
+  .legend { max-width: 1100px; margin: 32px auto 0; padding: 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(255,255,255,0.02); }
+  .legend h3 { font-size: 0.95rem; margin-bottom: 10px; }
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .legend-item { font-size: 0.78rem; color: #94a3b8; }
+  .legend-item strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>Agentic Patient Lifecycle AI System — Architecture</h1>
+<p class="subtitle">Solver AI Sdn Bhd Technical Assessment | 7-Layer Production Architecture</p>
+
+<!-- Five Agent Badges -->
+<div class="agents-strip">
+  <div class="agent-badge agent-previsit">🔵 Pre-Visit Agent<br><small>Intake · Validation · Risk</small></div>
+  <div class="agent-badge agent-postvisit">🟢 Post-Visit Agent<br><small>Recovery · NLP · Red Flags</small></div>
+  <div class="agent-badge agent-billing">🟠 Billing Agent<br><small>Claims · Duplicates · SLA</small></div>
+  <div class="agent-badge agent-retention">🟣 Retention Agent<br><small>Re-engage · Consent · Segment</small></div>
+  <div class="agent-badge agent-triage">🔴 Triage Agent<br><small>Symptoms · Urgency · Safety</small></div>
+</div>
+
+<div class="diagram">
+
+  <!-- Layer 1: Chat Layer -->
+  <div class="layer chat-layer">
+    <div class="layer-header">
+      <div class="layer-num">1</div>
+      <div class="layer-title">CHAT LAYER — Patient-Facing Interface</div>
+    </div>
+    <div class="layer-desc">
+      n8n Form triggers collect structured input from patients/staff. Each form posts to a matching Webhook endpoint for programmatic API access. All 5 agents accessible via both UI forms and REST API.
+    </div>
+    <div class="components">
+      <div class="comp">📋 Pre-Visit Intake Form</div>
+      <div class="comp">📋 Post-Visit Check-In Form</div>
+      <div class="comp">📋 Billing Inquiry Form</div>
+      <div class="comp">📋 Retention Scan Form</div>
+      <div class="comp">📋 Clinical Triage Form</div>
+      <div class="comp">🌐 Webhook: /webhook/pre-visit-intake</div>
+      <div class="comp">🌐 Webhook: /webhook/post-visit-checkin</div>
+      <div class="comp">🌐 Webhook: /webhook/billing-inquiry</div>
+      <div class="comp">🌐 Webhook: /webhook/retention-scan</div>
+      <div class="comp">🌐 Webhook: /webhook/clinical-triage</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 2: Rules Engine -->
+  <div class="layer rules-layer">
+    <div class="layer-header">
+      <div class="layer-num">2</div>
+      <div class="layer-title">RULES ENGINE — Deterministic Logic</div>
+    </div>
+    <div class="layer-desc">
+      All validation, scoring, and control logic is deterministic — no AI involved. Ensures predictability, auditability, and safety for compliance-critical decisions.
+    </div>
+    <div class="components">
+      <div class="comp">✅ Mandatory Field Enforcement</div>
+      <div class="comp">🔤 Insurance Regex: POL-XX-XXXXXXXX</div>
+      <div class="comp">📊 Risk Score Calculator (points-based)</div>
+      <div class="comp">🤰 Conditional Logic (pregnancy F/15-55)</div>
+      <div class="comp">🔑 Idempotency Key Generator (SHA-256)</div>
+      <div class="comp">🚨 Emergency Keyword Scanner</div>
+      <div class="comp">⏱️ SLA Threshold Checks</div>
+      <div class="comp">✉️ Consent & Suppression Verifier</div>
+      <div class="comp">🔢 Frequency Cap Enforcer</div>
+      <div class="comp">💊 Coverage Code Matcher</div>
+      <div class="comp">📅 Insurance Expiry Validator</div>
+      <div class="comp">🔄 Duplicate Invoice Detector</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 3: LLM Layer -->
+  <div class="layer llm-layer">
+    <div class="layer-header">
+      <div class="layer-num">3</div>
+      <div class="layer-title">LLM LAYER — AI Reasoning & NLP Classification</div>
+    </div>
+    <div class="layer-desc">
+      Groq API (Llama 3.3 70B Versatile) provides NLP classification for non-deterministic tasks. Temperature 0.1 for consistency. Structured JSON output enforced via system prompts. Emergency keywords bypass LLM entirely.
+    </div>
+    <div class="components">
+      <div class="comp">🧠 Red-Flag Symptom Classifier (5 categories)</div>
+      <div class="comp">🧠 Clinical Triage Classifier (Emergency/Same-Day/Routine/Insufficient)</div>
+      <div class="comp">🧠 Free-Text Symptom Extraction</div>
+      <div class="comp">🧠 Pain Score vs Text Conflict Detection</div>
+      <div class="comp">⚡ Pre-LLM Emergency Bypass (zero-delay)</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 4: Data Store -->
+  <div class="layer data-layer">
+    <div class="layer-header">
+      <div class="layer-num">4</div>
+      <div class="layer-title">DATA STORE — Schema Design & Storage</div>
+    </div>
+    <div class="layer-desc">
+      8 entity schemas defined in JSON Schema Draft-07. Demo uses n8n static data for idempotency. Production: PostgreSQL (relational), Redis (cache/idempotency), Elasticsearch (audit indexing).
+    </div>
+    <div class="components">
+      <div class="comp">👤 Patient</div>
+      <div class="comp">🏥 Visit</div>
+      <div class="comp">📝 Intake Form</div>
+      <div class="comp">💬 Post-Visit Check</div>
+      <div class="comp">💰 Invoice</div>
+      <div class="comp">🛡️ Insurance Policy</div>
+      <div class="comp">⚠️ Clinical Alert</div>
+      <div class="comp">🎫 Escalation Ticket</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 5: Escalation Engine -->
+  <div class="layer esc-layer">
+    <div class="layer-header">
+      <div class="layer-num">5</div>
+      <div class="layer-title">ESCALATION ENGINE — Routing & SLA Management</div>
+    </div>
+    <div class="layer-desc">
+      Routes escalations to the correct destination with SLA deadlines. Cross-agent deduplication prevents duplicate tickets. Manual overrides require documented justification.
+    </div>
+    <div class="components">
+      <div class="comp">🚑 Emergency → 5 min SLA → Emergency Services</div>
+      <div class="comp">👩‍⚕️ Clinical → 1 hr SLA → Physician/Nurse</div>
+      <div class="comp">💳 Billing → 24 hr SLA → Billing Team</div>
+      <div class="comp">📋 Standard → 48 hr SLA → Admin Review</div>
+      <div class="comp">🔄 Dedup: agent|patientId|date key</div>
+      <div class="comp">🔐 Override: MGR-APPROVE / EXEC-WAIVER</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 6: Audit Log -->
+  <div class="layer audit-layer">
+    <div class="layer-header">
+      <div class="layer-num">6</div>
+      <div class="layer-title">AUDIT LOG — Immutable Event Record</div>
+    </div>
+    <div class="layer-desc">
+      Every node outputs structured audit log entries. Records all system events including escalations, overrides, validation failures, and SLA breaches. Append-only — never modified or deleted.
+    </div>
+    <div class="components">
+      <div class="comp">INTAKE_RECEIVED</div>
+      <div class="comp">INTAKE_VALIDATED</div>
+      <div class="comp">FOLLOW_UP_TASK_CREATED</div>
+      <div class="comp">RED_FLAG_DETECTED</div>
+      <div class="comp">ESCALATION_CREATED</div>
+      <div class="comp">ESCALATION_DEDUP_BLOCKED</div>
+      <div class="comp">DUPLICATE_INVOICE_BLOCKED</div>
+      <div class="comp">SLA_BREACH_DETECTED</div>
+      <div class="comp">RETENTION_OUTREACH_SENT</div>
+      <div class="comp">RETENTION_SUPPRESSED</div>
+      <div class="comp">TRIAGE_EMERGENCY</div>
+      <div class="comp">TRIAGE_CLASSIFIED</div>
+      <div class="comp">BILLING_OVERRIDE_APPLIED</div>
+      <div class="comp">BILLING_FAQ_RESPONSE</div>
+    </div>
+  </div>
+
+  <div class="arrow-container">▼</div>
+
+  <!-- Layer 7: Admin Dashboard -->
+  <div class="layer dash-layer">
+    <div class="layer-header">
+      <div class="layer-num">7</div>
+      <div class="layer-title">ADMIN DASHBOARD — Monitoring & Visibility</div>
+    </div>
+    <div class="layer-desc">
+      Operational dashboard surfacing real-time metrics across all 5 agents. Red flags, claims, risk patients, SLA breaches, retention conversion, and escalation volume.
+    </div>
+    <div class="components">
+      <div class="comp">📊 Red Flag Cases (volume, category, status)</div>
+      <div class="comp">💰 Unresolved Claims (age, value, escalation)</div>
+      <div class="comp">⚠️ High-Risk Patients (intake flags, alerts)</div>
+      <div class="comp">⏱️ SLA Breaches (by agent, time overdue)</div>
+      <div class="comp">📈 Retention Conversion Rate</div>
+      <div class="comp">🔔 Escalation Volume (by agent & type)</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Agent Flow Details -->
+<div class="flow-section">
+  <h2>Agent Workflow Flows</h2>
+  <div class="flow-grid">
+
+    <div class="flow-card">
+      <h3 style="color:#60a5fa">🔵 Pre-Visit Agent Flow</h3>
+      <ul class="flow-steps">
+        <li>Form Trigger: Collect intake data (name, DOB, gender, phone, insurance, medical history)</li>
+        <li>Webhook: /webhook/pre-visit-intake (API access)</li>
+        <li>Mandatory Field Validation: Check all required fields present</li>
+        <li>Insurance Format Check: Regex ^POL-[A-Z]{2}-[0-9]{8}$</li>
+        <li>Conditional Logic: If female & age 15-55, check pregnancy status</li>
+        <li>Risk Score Calculator: Points-based scoring (hypertension+3, chest-pain+4, etc.)</li>
+        <li>Decision: Score ≥7 → Nurse Queue Escalation | Score &lt;7 → Normal confirmation</li>
+        <li>Incomplete → Schedule 24h follow-up task (SMS, 2 retries)</li>
+        <li>Audit Log: INTAKE_RECEIVED, INTAKE_VALIDATED, ESCALATION_CREATED</li>
+      </ul>
+    </div>
+
+    <div class="flow-card">
+      <h3 style="color:#34d399">🟢 Post-Visit Agent Flow</h3>
+      <ul class="flow-steps">
+        <li>Form Trigger: Collect pain score (0-10), free-text symptoms, visit ID</li>
+        <li>Webhook: /webhook/post-visit-checkin (API access)</li>
+        <li>Input Validation: Verify patient ID, visit ID, pain score range</li>
+        <li>NLP Red-Flag Classifier: Groq LLM analyzes free text for 5 categories</li>
+        <li>Conflict Detection: High pain score + minimizing text → forced escalation</li>
+        <li>Emergency: Breathing/bleeding → immediate escalation (5 min SLA)</li>
+        <li>Clinical: High pain/fever/side effects → physician escalation (1 hr SLA)</li>
+        <li>Normal: Low pain, no flags → schedule 48h proactive check-in</li>
+        <li>Audit Log: RED_FLAG_DETECTED, ESCALATION_CREATED, CHECK_IN_LOGGED</li>
+      </ul>
+    </div>
+
+    <div class="flow-card">
+      <h3 style="color:#fbbf24">🟠 Billing Agent Flow</h3>
+      <ul class="flow-steps">
+        <li>Form Trigger: Collect patient ID, visit ID, treatment codes, amounts, policy info</li>
+        <li>Webhook: /webhook/billing-inquiry (API access)</li>
+        <li>FAQ Engine: Keyword-match against 8 billing FAQ categories</li>
+        <li>Duplicate Detection: Generate idempotency key (patient+visit+codes+date)</li>
+        <li>Insurance Expiry Check: Policy expiryDate vs current date</li>
+        <li>Coverage Matching: Treatment codes vs policy coveredCodes</li>
+        <li>SLA Tracking: Claims &gt;30 days → auto-escalate to billing manager</li>
+        <li>Manual Override: Requires valid code + justification → audit trail</li>
+        <li>Audit Log: DUPLICATE_BLOCKED, SLA_BREACH, OVERRIDE_APPLIED</li>
+      </ul>
+    </div>
+
+    <div class="flow-card">
+      <h3 style="color:#a78bfa">🟣 Retention Agent Flow</h3>
+      <ul class="flow-steps">
+        <li>Form Trigger: Input patient data (or batch array) for retention scan</li>
+        <li>Webhook: /webhook/retention-scan (API access)</li>
+        <li>Inactivity Check: Last visit &gt;6 months ago?</li>
+        <li>Auto-Segmentation: Classify by condition keywords (chronic/wellness/post-procedure/lapsed/at-risk)</li>
+        <li>Suppression Check: Block if unresolved clinical or billing issues</li>
+        <li>Consent Verification: messagingConsent must be true</li>
+        <li>Frequency Cap: Max 2 contacts/month per patient</li>
+        <li>Re-engagement: Send segment-appropriate message or suppress</li>
+        <li>Audit Log: RETENTION_OUTREACH_SENT, RETENTION_SUPPRESSED</li>
+      </ul>
+    </div>
+
+    <div class="flow-card" style="grid-column: 1 / -1;">
+      <h3 style="color:#f87171">🔴 Clinical Triage Agent Flow</h3>
+      <ul class="flow-steps">
+        <li>Form Trigger: Collect patient symptom description (free text)</li>
+        <li>Webhook: /webhook/clinical-triage (API access)</li>
+        <li>Emergency Keyword Scanner: Check for 'chest pain', 'can't breathe', 'unconscious', 'heart attack', 'severe bleeding', 'stroke', 'seizure', 'choking', 'overdose'</li>
+        <li>If Emergency Keyword Found → IMMEDIATE escalation to emergency services (5 min SLA) — LLM bypassed entirely</li>
+        <li>If No Emergency → Send to Groq LLM Classifier (Llama 3.3 70B, temp 0.1)</li>
+        <li>LLM classifies: Emergency / Same-Day / Routine / Insufficient</li>
+        <li>Insufficient → Generate structured follow-up questions (never classify without enough info)</li>
+        <li>All responses include mandatory medical disclaimer — no diagnoses, no definitive advice</li>
+        <li>Audit Log: TRIAGE_EMERGENCY, TRIAGE_CLASSIFIED, TRIAGE_FOLLOWUP_QUESTIONS</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- Data Flow Legend -->
+<div class="legend">
+  <h3>Key Design Principles</h3>
+  <div class="legend-grid">
+    <div class="legend-item"><strong>Safety First:</strong> Emergency keywords bypass LLM — deterministic, zero-delay</div>
+    <div class="legend-item"><strong>No Hallucination:</strong> Clinical responses never diagnose or provide definitive medical advice</div>
+    <div class="legend-item"><strong>Idempotency:</strong> Composite keys prevent duplicate invoices, alerts, escalations</div>
+    <div class="legend-item"><strong>Audit Trail:</strong> Every action logged immutably — compliance-ready</div>
+    <div class="legend-item"><strong>SLA Enforcement:</strong> Tiered deadlines (5min → 48hr) with auto-escalation</div>
+    <div class="legend-item"><strong>Consent-Safe:</strong> No outreach without verified messaging consent</div>
+    <div class="legend-item"><strong>Deterministic Rules:</strong> Validation, scoring, and controls use rules engine — no AI</div>
+    <div class="legend-item"><strong>Graceful Fallback:</strong> LLM failure → manual review escalation with safe defaults</div>
+  </div>
+</div>
+
+<p style="text-align:center; margin-top:32px; font-size:0.75rem; color:#475569;">
+  Agentic Patient Lifecycle AI System — Solver AI Sdn Bhd Technical Assessment | Architecture v2.0
+</p>
+
+</body>
+</html>

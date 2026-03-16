@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EscalationTicket",
+  "description": "Escalation ticket created when any agent triggers an escalation. Tracks assignment, SLA compliance, resolution, and audit trail. Manual overrides require documented justification.",
+  "type": "object",
+  "required": [
+    "ticketId",
+    "alertId",
+    "patientId",
+    "sourceAgent",
+    "escalationType",
+    "assignedTo",
+    "priority",
+    "slaDeadline",
+    "status",
+    "createdAt"
+  ],
+  "properties": {
+    "ticketId": {
+      "type": "string",
+      "pattern": "^ESC-[0-9]{8}$",
+      "description": "Unique escalation ticket identifier. Format: ESC-XXXXXXXX."
+    },
+    "alertId": {
+      "type": "string",
+      "pattern": "^ALT-[0-9]{8}$",
+      "description": "Reference to the Clinical Alert that triggered this escalation."
+    },
+    "patientId": {
+      "type": "string",
+      "pattern": "^PAT-[0-9]{8}$",
+      "description": "Reference to the Patient record."
+    },
+    "sourceAgent": {
+      "type": "string",
+      "enum": ["pre-visit", "post-visit", "billing", "retention", "clinical-triage"],
+      "description": "Which agent pillar created this ticket."
+    },
+    "escalationType": {
+      "type": "string",
+      "enum": [
+        "nurse-queue",
+        "physician-review",
+        "emergency-services",
+        "prescribing-doctor",
+        "billing-manager",
+        "billing-team",
+        "clinical-team",
+        "admin-review"
+      ],
+      "description": "Type of escalation determining the routing destination."
+    },
+    "assignedTo": {
+      "type": "string",
+      "description": "Role or specific user ID the ticket is assigned to."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Ticket priority. Critical = immediate action required (emergency). High = within SLA. Medium/Low = standard queue."
+    },
+    "slaDeadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "SLA deadline for response/resolution. Emergency: 5 minutes. Clinical-High: 1 hour. Billing: 24 hours. Standard: 48 hours."
+    },
+    "slaBreached": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if current time exceeds slaDeadline and ticket is not resolved."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "assigned", "in-progress", "pending-info", "resolved", "closed", "cancelled"],
+      "description": "Current ticket status."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 3000,
+      "description": "Detailed description of why escalation was triggered."
+    },
+    "overrideJustification": {
+      "type": ["string", "null"],
+      "minLength": 10,
+      "description": "REQUIRED if any manual override is applied. Must document the reason. Logged to audit trail per compliance requirement."
+    },
+    "auditTrail": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["action", "performedBy", "timestamp"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Action taken (e.g., 'created', 'assigned', 'status-changed', 'override-applied', 'sla-breached', 'resolved')."
+          },
+          "performedBy": {
+            "type": "string",
+            "description": "System agent or user ID that performed the action."
+          },
+          "previousValue": {
+            "type": ["string", "null"],
+            "description": "Previous value before the change."
+          },
+          "newValue": {
+            "type": ["string", "null"],
+            "description": "New value after the change."
+          },
+          "notes": {
+            "type": ["string", "null"],
+            "description": "Additional context or justification."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "description": "Immutable audit trail recording every action on this ticket. Required for compliance."
+    },
+    "relatedTickets": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs of related escalation tickets (e.g., re-escalation of unresolved issue)."
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "description": "Prevents duplicate ticket creation. Generated from: alertId + sourceAgent + escalationType. System rejects if a matching open ticket already exists."
+    },
+    "resolvedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "resolvedBy": {
+      "type": ["string", "null"]
+    },
+    "resolutionSummary": {
+      "type": ["string", "null"],
+      "description": "Summary of resolution actions taken."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}
