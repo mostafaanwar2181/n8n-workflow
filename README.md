@@ -19,6 +19,7 @@
 11. [Video Presentation](#video-presentation)
 12. [AI Disclosure](#ai-disclosure)
 13. [Folder Structure](#folder-structure)
+14. [GitHub Copilot Troubleshooting](#github-copilot-troubleshooting)
 
 ---
 
@@ -552,3 +553,53 @@ As required by Section 9 of the assessment:
 └── dashboard/
     └── dashboard-mockup.html                    # Admin dashboard mockup with 6 metric panels + annotations
 ```
+
+---
+
+## GitHub Copilot Troubleshooting
+
+> **Topic:** Why does **Claude Opus 4.6** appear in GitHub Copilot Chat on
+> [github.com](https://github.com/copilot) but **not** in VS Code for the same
+> Copilot Pro account?
+
+Model availability can differ between GitHub Copilot Chat on the web and the VS Code
+extension because of **staged rollouts, feature flags, regional availability,
+enterprise/org policy, account mismatch, extension version**, and whether
+**Copilot Chat is enabled** in the editor. No specific model is guaranteed to be
+available in every environment simultaneously.
+
+### Reference: Web UI Model Selector
+
+The screenshot below shows **GitHub Copilot Chat on github.com** (the web surface)
+with Claude Opus 4.6 visible in the model drop-down. This is the *web UI* — the same
+model may not yet be rolled out to the VS Code extension for all accounts.
+
+> *Screenshot: GitHub Copilot Chat web UI — model selector showing Claude Opus 4.6.*
+>
+> *(Insert web-UI screenshot here — see the model picker at github.com/copilot.)*
+
+### Quick Troubleshooting Checklist
+
+- [ ] **Verify account** — VS Code is signed into the **same GitHub account** that has
+  Copilot Pro (verify at [github.com/settings/copilot](https://github.com/settings/copilot));
+  check under **Accounts** in VS Code.
+- [ ] **Update VS Code** to the latest stable release (**Help → Check for Updates**).
+- [ ] **Update extensions** — install the latest **GitHub Copilot** and
+  **GitHub Copilot Chat** from the Extensions panel (`Ctrl+Shift+X`), then reload.
+- [ ] **Open Copilot Chat** — use the Copilot icon in the Activity Bar or the Command
+  Palette (`Ctrl+Shift+P → "GitHub Copilot Chat"`). Look for a **model picker
+  drop-down** near the chat input.
+- [ ] **Try Codespaces** — create a Codespace from **Code → Codespaces** to rule out a
+  local VS Code issue. Note: `github.dev` (the lightweight browser editor) does **not**
+  provide the full Copilot Chat model experience.
+- [ ] **Check org policy** — if using a managed/org account, ask an org owner to
+  verify that third-party AI model access is allowed under
+  **Settings → Copilot → Policies**.
+- [ ] **Collect diagnostics** — open the **Output** panel (`Ctrl+Shift+U`), select
+  **"GitHub Copilot Chat"** and copy the log. Also note your VS Code version
+  (**Help → About**) and extension versions before contacting
+  [GitHub Support](https://support.github.com).
+
+📄 **Full guide:** [docs/copilot-model-troubleshooting.md](docs/copilot-model-troubleshooting.md)
+
+---
