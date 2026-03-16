@@ -19,6 +19,7 @@
 11. [Video Presentation](#video-presentation)
 12. [AI Disclosure](#ai-disclosure)
 13. [Folder Structure](#folder-structure)
+14. [Troubleshooting: Copilot Models / Opus 4.6 Not Showing in VS Code](#troubleshooting-copilot-models--opus-46-not-showing-in-vs-code)
 
 ---
 
@@ -552,3 +553,84 @@ As required by Section 9 of the assessment:
 └── dashboard/
     └── dashboard-mockup.html                    # Admin dashboard mockup with 6 metric panels + annotations
 ```
+
+---
+
+## Troubleshooting: Copilot Models / Opus 4.6 Not Showing in VS Code
+
+If you have **GitHub Copilot Pro** but cannot find or select a specific model (such as "Opus 4.6") in VS Code, work through the checklist below.
+
+> **Note:** Model names and availability change over time. "Opus 4.6" is used here as an example from a user report; the exact name shown in your model picker may differ. Always check the Copilot model picker for the current list of models available to your account.
+
+### Why a model may not appear
+
+Model availability in GitHub Copilot Chat is determined by several independent factors — all of them must be satisfied before a model shows up in the picker:
+
+| Factor | What to check |
+|---|---|
+| **Copilot plan** | Some models are restricted to Copilot Pro, Pro+, Business, or Enterprise plans. Verify your plan at [github.com/settings/copilot](https://github.com/settings/copilot). |
+| **Feature rollout / preview** | New models are often released gradually. A model may be available to some users but not yet to you even on the same plan. |
+| **Region / org policy** | Your GitHub organisation or enterprise may restrict which models members can use. Contact your org admin if you are on a managed account. |
+| **Editor / extension version** | Older versions of VS Code or the Copilot extensions may not expose newer models. Always keep both up to date. |
+| **Signed-in GitHub account** | The Copilot subscription must be on the account you are currently signed into in VS Code. Mixed personal/work accounts are a common source of confusion. |
+
+---
+
+### Step-by-step checklist
+
+#### 1 — Update VS Code and the Copilot extensions
+
+- [ ] Open VS Code → **Help → Check for Updates** and install any pending update.
+- [ ] Open the **Extensions** panel (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+- [ ] Search **"GitHub Copilot"** and click **Update** if an update is available.
+- [ ] Search **"GitHub Copilot Chat"** and click **Update** if an update is available.
+- [ ] Reload/restart VS Code after updating.
+
+#### 2 — Verify you are signed into the correct GitHub account
+
+- [ ] Click the **Accounts** icon in the VS Code Activity Bar (bottom-left).
+- [ ] Confirm the account shown is the one that holds your Copilot subscription.
+- [ ] If the wrong account is shown, sign out and sign back in with the correct account.
+
+#### 3 — Confirm your Copilot subscription is active
+
+- [ ] Go to [github.com/settings/copilot](https://github.com/settings/copilot) in a browser.
+- [ ] Confirm the plan is **active** and not in a trial-expired or paused state.
+- [ ] If you are a member of an organisation, ask your admin to confirm that Copilot access is enabled for your account.
+
+#### 4 — Enable Copilot Chat (if not already enabled)
+
+- [ ] In VS Code, open **Settings** (`Ctrl+,` / `Cmd+,`) and search **"Copilot Chat"**.
+- [ ] Ensure `github.copilot.chat.enabled` is set to `true` (or that it is not explicitly disabled).
+- [ ] Restart VS Code.
+
+#### 5 — Open the model picker in Copilot Chat
+
+- [ ] Open the **Copilot Chat** panel (chat icon in the Activity Bar, or `Ctrl+Alt+I`).
+- [ ] Look for a **model selector** — it is usually a dropdown or a small label near the top of the chat input area (the exact placement may vary by extension version).
+- [ ] Click the selector to see the list of currently available models.
+- [ ] If the model you are looking for is not listed, it may not yet be available on your plan or in your region (see the table above).
+
+#### 6 — Check for known limitations in github.dev
+
+- [ ] **github.dev** (the lightweight "VS Code in the browser" editor) does **not** support the full set of VS Code extensions. Copilot and Copilot Chat extensions may be unavailable or restricted there.
+- [ ] For the full Copilot feature set — including all model choices — use **local VS Code** or **GitHub Codespaces**.
+
+---
+
+### github.dev vs Codespaces vs local VS Code
+
+| Environment | Copilot support | Notes |
+|---|---|---|
+| **local VS Code** | ✅ Full support | Install the Copilot and Copilot Chat extensions; sign in. |
+| **GitHub Codespaces** | ✅ Full support | Extensions install automatically or can be added via the Extensions panel. |
+| **github.dev** | ⚠️ Limited | Many extensions — including Copilot — cannot be installed. Use Codespaces for full Copilot access. |
+
+---
+
+### Useful links
+
+- [GitHub Copilot plans and features](https://docs.github.com/en/copilot/about-github-copilot/subscription-plans-for-github-copilot)
+- [Supported AI models for GitHub Copilot](https://docs.github.com/en/copilot/using-github-copilot/ai-models/changing-the-ai-model-for-copilot-chat)
+- [Troubleshooting GitHub Copilot in your environment](https://docs.github.com/en/copilot/troubleshooting-github-copilot/troubleshooting-github-copilot-in-your-environment)
+- [Manage your Copilot subscription](https://github.com/settings/copilot)
