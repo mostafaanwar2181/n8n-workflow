@@ -9,7 +9,7 @@
 1. [Project Overview](#project-overview)
 2. [Architecture Overview](#architecture-overview)
 3. [Technology Decisions](#technology-decisions)
-4. [Setup Instructions](#setup-instructions)
+4. [Setup Instructions](#setup-instructions) · [Full run guide →](docs/RUNNING.md)
 5. [Agent Descriptions](#agent-descriptions)
 6. [Data Models](#data-models)
 7. [Testing](#testing)
@@ -121,17 +121,34 @@ A full architecture diagram is provided in the `/architecture/` directory.
 
 ## Setup Instructions
 
+> **Full run instructions** (local, Docker, and GitHub Codespaces) are available in [`docs/RUNNING.md`](docs/RUNNING.md).
+
 ### Prerequisites
 
-- **Node.js** (v18 or later) — [Download](https://nodejs.org/)
-- **n8n** — Workflow automation platform
+- **Node.js** (v18 or later) — [Download](https://nodejs.org/) · verify with `node --version`
+- **n8n** — Workflow automation platform (launched via `npx`, Docker, or a Codespace — no global install needed)
 - **Groq API Key** — For LLM-powered agents (Post-Visit NLP, Clinical Triage) — [Get free key](https://console.groq.com/)
 
 ### Step 1: Install & Start n8n
 
+**Option A — npx (recommended for local development):**
 ```bash
 npx n8n start
 ```
+
+**Option B — Docker:**
+```bash
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v "$(pwd)/n8n-workflows:/home/node/.n8n/workflows" \
+  docker.n8n.io/n8nio/n8n
+```
+
+**Option C — GitHub Codespaces (zero-install, browser-based):**
+1. Click **Code → Codespaces → Create codespace on main** on the GitHub repo page.
+2. In the Codespace terminal, run `npx n8n start`.
+3. Open port `5678` from the **Ports** tab.
 
 n8n will start at `http://localhost:5678`.
 
