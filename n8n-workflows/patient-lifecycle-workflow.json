@@ -353,7 +353,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer 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"
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
             },
             {
               "name": "Content-Type",
@@ -775,7 +775,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer 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"
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
             },
             {
               "name": "Content-Type",
