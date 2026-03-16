@@ -14,11 +14,12 @@
 6. [Data Models](#data-models)
 7. [Testing](#testing)
 8. [Dashboard](#dashboard)
-9. [Known Limitations](#known-limitations)
-10. [Bonus Features](#bonus-features)
-11. [Video Presentation](#video-presentation)
-12. [AI Disclosure](#ai-disclosure)
-13. [Folder Structure](#folder-structure)
+9. [Editing & Running This Project (VS Code-like Experience)](#editing--running-this-project-vs-code-like-experience)
+10. [Known Limitations](#known-limitations)
+11. [Bonus Features](#bonus-features)
+12. [Video Presentation](#video-presentation)
+13. [AI Disclosure](#ai-disclosure)
+14. [Folder Structure](#folder-structure)
 
 ---
 
@@ -469,6 +470,120 @@ Invalid codes are rejected with an error. Valid overrides require a non-empty `j
 - Duplicate escalations within the same calendar day are blocked with a `409 DUPLICATE_BLOCKED` response
 - First-time escalations write the key to static data and proceed normally
 - `ESCALATION_DEDUP_BLOCKED` audit event emitted for all duplicates
+
+---
+
+## Editing & Running This Project (VS Code-like Experience)
+
+You can edit the code and run this project directly from GitHub — no local installation required. Below are your options, from quickest to most powerful.
+
+---
+
+### Option 1: GitHub Web Editor (Quick Single-File Edits)
+
+Best for: small typo fixes, updating a JSON field, editing the README.
+
+1. Open any file in this repository on GitHub (e.g., `n8n-workflows/patient-lifecycle-workflow.json`).
+2. Click the **pencil icon** (✏️ Edit this file) in the top-right corner of the file view.
+3. Make your changes in the text editor.
+4. Scroll down, add a commit message, and click **Commit changes**.
+
+> **Limitation:** One file at a time only. No terminal, no running the project.
+
+---
+
+### Option 2: github.dev — VS Code in the Browser (Multi-File Editing)
+
+Best for: editing multiple files, navigating the codebase, reviewing workflow JSON.
+
+**How to open:**
+
+- **Keyboard shortcut:** While viewing this repo on GitHub, press the `.` (dot) key.
+- **URL method:** Change `github.com` to `github.dev` in the address bar:
+  ```
+  https://github.com/mostafaanwar2181/n8n-workflow
+  →
+  https://github.dev/mostafaanwar2181/n8n-workflow
+  ```
+
+This opens a full VS Code interface in your browser with syntax highlighting, file tree, search, and multi-file editing.
+
+> **Limitation:** github.dev is an **editor only** — it has no terminal and cannot run `npx n8n start` or any commands. You cannot execute the workflow from here.
+
+---
+
+### Option 3: GitHub Codespaces — Full VS Code + Terminal (Recommended for Running the Project)
+
+Best for: running `npx n8n start`, installing dependencies, executing tests.
+
+**Prerequisites:**
+- You must have access to GitHub Codespaces (available on GitHub Free/Pro/Team/Enterprise plans; free tier includes 60 core-hours/month).
+- You need write access to the repository, or the repo owner must have Codespaces enabled.
+
+**Steps:**
+
+1. On this repository's GitHub page, click the green **`< > Code`** button.
+2. Select the **Codespaces** tab.
+3. Click **Create codespace on main**.
+4. Wait for the environment to build (~1–2 minutes). A VS Code interface opens in your browser with a full terminal.
+5. In the terminal, follow the [Setup Instructions](#setup-instructions):
+
+   ```bash
+   # Install and start n8n
+   npx n8n start
+   ```
+
+6. n8n will start at `http://localhost:5678`. GitHub Codespaces automatically forwards the port — click the **Open in Browser** notification, or go to the **Ports** tab and open port `5678`.
+7. Import the workflow: **Settings → Import from File → `n8n-workflows/patient-lifecycle-workflow.json`**.
+8. To run the automated test suite:
+   ```bash
+   node run-all-tests.js
+   ```
+
+**Stopping your Codespace:**
+- Close the browser tab (the codespace keeps running for a short idle period).
+- To stop immediately: go to [github.com/codespaces](https://github.com/codespaces), find your codespace, and click **Stop codespace**.
+- To delete it: click **Delete** from the same page to avoid using your free minutes.
+
+> **Billing note:** Codespaces beyond the free tier are billed per core-hour and storage. Check [github.com/settings/billing](https://github.com/settings/billing) to monitor usage.
+
+---
+
+### Option 4: Run Locally (VS Code on Your Machine)
+
+Best for: full control, offline use, production-like testing.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/mostafaanwar2181/n8n-workflow.git
+   cd n8n-workflow
+   ```
+
+2. **Open in VS Code:**
+   ```bash
+   code .
+   ```
+   *(Requires [VS Code](https://code.visualstudio.com/) installed and the `code` command in your PATH.)*
+
+3. **Follow the [Setup Instructions](#setup-instructions)** to install n8n and import the workflow.
+
+4. **Run the automated tests:**
+   ```bash
+   node run-all-tests.js
+   ```
+
+---
+
+### Summary: What You Can Do Where
+
+| Action | Web Editor | github.dev | Codespaces | Local |
+|---|:---:|:---:|:---:|:---:|
+| Edit files | ✅ (1 file) | ✅ (multi-file) | ✅ | ✅ |
+| Run `npx n8n start` | ❌ | ❌ | ✅ | ✅ |
+| Use the terminal | ❌ | ❌ | ✅ | ✅ |
+| Run `node run-all-tests.js` | ❌ | ❌ | ✅ | ✅ |
+| Access n8n at localhost:5678 | ❌ | ❌ | ✅ (port-forwarded) | ✅ |
+| Requires local install | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
